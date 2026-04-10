@@ -1,4 +1,4 @@
-# Zero Token Gateway
+# LLM Gateway (llmgw)
 
 OpenAI-compatible API gateway that routes requests to **free web-based LLM providers** using browser cookies — no API tokens required.
 
@@ -6,27 +6,60 @@ Based on [openclaw-zero-token](https://github.com/linuxhsj/openclaw-zero-token),
 
 ## Supported Providers
 
-| Provider | Auth Method | Models |
-|----------|------------|--------|
-| **DeepSeek** | Browser cookie | deepseek-chat, deepseek-reasoner, search variants |
-| **Claude** | Browser cookie + org ID | claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-6 |
-| **Kimi** | Browser cookie | moonshot-v1-8k/32k/128k |
-| **Ollama** | None (local) | Any local model |
-| **Any OpenAI-compat** | API key | Any compatible API |
+| Provider | Type | Status | Models |
+|----------|------|--------|--------|
+| DeepSeek | HTTP | ✅ Done | deepseek-chat, deepseek-reasoner, search variants |
+| Claude | HTTP | ✅ Done | claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-6 |
+| Kimi | HTTP | ✅ Done | moonshot-v1-8k/32k/128k |
+| Xiaomi MiMo | HTTP | ✅ Done | xiaomimo-chat, mimo-v2-pro |
+| OpenAI Compat | HTTP | ✅ Done | Any OpenAI-compatible API |
+| Ollama | HTTP | ✅ Done | Any local model |
+| vLLM | HTTP | ✅ Done | Any local model |
+| ChatGPT Web | Playwright | ✅ Done | gpt-4, gpt-4-turbo |
+| Gemini Web | Playwright | ✅ Done | gemini-pro, gemini-ultra |
+| Grok Web | Playwright | ✅ Done | grok-1, grok-2 |
+| Qwen International | Playwright | ✅ Done | qwen3.5-plus, qwen3.5-turbo |
+| Qwen China | Playwright | ✅ Done | Qwen3.5-Plus, Qwen3.5-Turbo |
+| GLM (Zhipu) | Playwright | ✅ Done | glm-4-plus, glm-4-think |
+| GLM International | Playwright | ✅ Done | GLM-4 Plus, GLM-4 Think |
+| Doubao | Playwright | ✅ Done | doubao-seed-2.0, doubao-pro |
+| Perplexity | Playwright | ✅ Done | perplexity-web, perplexity-pro |
+| Kimi (Playwright) | Playwright | ✅ Done | moonshot-v1-8k/32k/128k |
+
+### Provider 实现对照表（vs 原项目 openclaw-zero-token）
+
+| Provider | 原项目实现方式 | 本项目状态 | 备注 |
+|----------|-------------|-----------|------|
+| DeepSeek | HTTP fetch + PoW | ✅ | 保留 PoW + WASM |
+| Claude | HTTP fetch + cookie | ✅ | |
+| Kimi | Playwright 浏览器 | ✅ HTTP + ✅ Playwright 两个版本 | |
+| ChatGPT | Playwright 浏览器 | ✅ | DOM 交互 |
+| Gemini | Playwright 浏览器 | ✅ | DOM 交互 |
+| Grok | Playwright 浏览器 | ✅ | DOM 交互 |
+| Qwen (国际) | Playwright 浏览器 | ✅ | |
+| Qwen (国内) | Playwright 浏览器 | ✅ | |
+| GLM | Playwright 浏览器 | ✅ | |
+| GLM 国际 | Playwright 浏览器 | ✅ | |
+| Doubao | HTTP fetch | ✅ Playwright 版 | HTTP 版需要复杂动态参数 |
+| Xiaomi MiMo | HTTP fetch | ✅ | |
+| Perplexity | Playwright 浏览器 | ✅ | |
+| Manus | API key (付费) | ❌ 不需要 | 原项目标注 free quota，但需要 API key |
 
 ## Quick Start
 
 ```bash
 # 1. Install dependencies
-cd zero-token-gateway
 npm install
 
-# 2. Create config from example
+# 2. Install Playwright browsers (only if using Playwright providers)
+npx playwright install chromium
+
+# 3. Create config from example
 cp config.example.json config.json
 
-# 3. Edit config.json with your browser cookies
+# 4. Edit config.json with your browser cookies
 
-# 4. Start the server
+# 5. Start the server
 npm start
 ```
 
@@ -36,17 +69,17 @@ npm start
 1. Open [chat.deepseek.com](https://chat.deepseek.com) in your browser
 2. Log in
 3. Open DevTools → Network tab
-4. Copy the `Cookie` header from any request to `chat.deepseek.com`
+4. Copy the `Cookie` header from any request
 
 ### Claude
-1. Open [claude.ai](https://claude.ai) in your browser
-2. Log in
-3. Copy cookies from DevTools
-4. Also note your organization UUID from the URL or API responses
+1. Open [claude.ai](https://claude.ai), log in
+2. Copy cookies from DevTools
+3. Also note your organization UUID
 
-### Kimi
-1. Open [kimi.moonshot.cn](https://kimi.moonshot.cn) in your browser
-2. Log in and copy cookies
+### Kimi / ChatGPT / Gemini / Grok / etc.
+1. Open the website, log in
+2. Open DevTools → Application → Cookies
+3. Copy all cookies as a single string (`name1=value1; name2=value2`)
 
 ## API Usage
 
@@ -60,18 +93,6 @@ curl -X POST http://localhost:3456/v1/chat/completions \
     "model": "deepseek-chat",
     "messages": [{"role": "user", "content": "Hello!"}],
     "stream": true
-  }'
-```
-
-### Chat Completions (Non-streaming)
-
-```bash
-curl -X POST http://localhost:3456/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "deepseek-reasoner",
-    "messages": [{"role": "user", "content": "Explain quantum computing"}],
-    "stream": false
   }'
 ```
 
@@ -95,15 +116,19 @@ Edit `config.json`:
 {
   "port": 3456,              // Server port (also via PORT env var)
   "apiKey": "secret",        // Optional API key (also via API_KEY env var)
-  "providers": {             // Provider credentials
+  "providers": {
     "deepseek": {
       "_type": "deepseek",
       "cookie": "..."
+    },
+    "chatgpt": {
+      "_type": "chatgpt",
+      "cookie": "..."
     }
   },
-  "modelMapping": {          // Model name → provider key
+  "modelMapping": {
     "deepseek-chat": "deepseek",
-    "deepseek*": "deepseek"  // Wildcard matching
+    "gpt-4": "chatgpt"
   }
 }
 ```
@@ -111,8 +136,22 @@ Edit `config.json`:
 ### Environment Variables
 
 - `PORT` — Override server port
-- `CONFIG_PATH` — Override config file path (default: `config.json`)
+- `CONFIG_PATH` — Override config file path
 - `API_KEY` — Override API key
+
+### Playwright Options
+
+For Playwright-based providers, additional options:
+
+```jsonc
+{
+  "_type": "chatgpt",
+  "cookie": "...",
+  "headless": true,          // default: true
+  "browserPath": "/usr/bin/chromium",  // optional
+  "cdpUrl": "http://127.0.0.1:9222"   // connect to existing Chrome
+}
+```
 
 ## Architecture
 
@@ -120,24 +159,12 @@ Edit `config.json`:
 Client (OpenAI SDK) → HTTP Server → Model Router → Provider → Web API (free)
 ```
 
-The gateway:
-1. Receives OpenAI-format `/v1/chat/completions` requests
-2. Maps the `model` name to a provider using `modelMapping`
-3. Sends the request through the provider's web API (using cookies for auth)
-4. Streams back the response in OpenAI SSE format
-
 ## Using with OpenAI SDKs
-
-Works with any OpenAI-compatible client:
 
 ```python
 from openai import OpenAI
 
-client = OpenAI(
-    base_url="http://localhost:3456/v1",
-    api_key="your-api-key-here"
-)
-
+client = OpenAI(base_url="http://localhost:3456/v1", api_key="key")
 response = client.chat.completions.create(
     model="deepseek-chat",
     messages=[{"role": "user", "content": "Hello!"}],
@@ -145,24 +172,6 @@ response = client.chat.completions.create(
 )
 for chunk in response:
     print(chunk.choices[0].delta.content or "", end="")
-```
-
-```javascript
-import OpenAI from "openai";
-
-const client = new OpenAI({
-  baseURL: "http://localhost:3456/v1",
-  apiKey: "your-api-key-here",
-});
-
-const stream = await client.chat.completions.create({
-  model: "deepseek-chat",
-  messages: [{ role: "user", content: "Hello!" }],
-  stream: true,
-});
-for await (const chunk of stream) {
-  process.stdout.write(chunk.choices[0]?.delta?.content || "");
-}
 ```
 
 ## License
