@@ -32,21 +32,31 @@ const PROVIDERS = [
 ];
 
 // ─── HTTP helpers ──────────────────────────────────────────────
-async function httpGet(url, timeoutMs = 3000) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  } finally {
-    clearTimeout(timer);
-  }
+
+/** Probe a TCP port — returns true if connection succeeds within timeoutMs */
+function probeTcpPort(host, port, timeoutMs = 2000) {
+  return new Promise((resolve) => {
+    const socket = createConnection({ host, port }, () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.setTimeout(timeoutMs);
+    socket.on('timeout', () => { socket.destroy(); resolve(false); });
+    socket.on('error', () => { socket.destroy(); resolve(false); });
+  });
 }
 
-/** Try each host until one responds to /json/version */
+async function httpGet(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+/** Try each host — first TCP-probe, then HTTP fetch */
 async function findCdpUrl() {
   for (const host of CDP_HOSTS) {
+    const reachable = await probeTcpPort(host, CDP_PORT, 2000);
+    if (!reachable) continue;
     const url = `http://${host}:${CDP_PORT}`;
     try {
       await httpGet(`${url}/json/version`);
