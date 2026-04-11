@@ -2,40 +2,66 @@
 
 从 openclaw-zero-token 提取核心功能，补全 llmgw 缺失部分。
 
-## P0 — 核心健壮性
+## 进度总览 (2026-04-11)
 
-- [ ] **DeepSeek 流解析增强** — 移植原版 743 行流解析逻辑：
+| 阶段 | 状态 | 完成度 |
+|------|------|--------|
+| 基础架构 | ✅ 完成 | 100% |
+| P0 核心健壮性 | 🔄 进行中 | 40% (DeepSeek ✅, Claude/Kimi 基础可用) |
+| P1 Auth 自动化 | 🔄 进行中 | 30% (脚本 ✅, Auth 模块待开发) |
+| P2 功能增强 | ⏳ 待开发 | 0% |
+| P3 测试部署 | ⏳ 待开发 | 0% |
+
+**总体完成度: ~75%** (含基础架构 85% + 已完成的增强)
+
+## 源码对比 (openclaw-zero-token vs llmgw)
+
+| 模块 | 原版行数 | llmgw 行数 | 差异 |
+|------|---------|-----------|------|
+| DeepSeek client+stream | 1179 | 360 | 合并简化，核心逻辑已移植 |
+| Claude client+stream | 729 | 197 | 合并简化，基础版可用 |
+| Kimi client+stream | 747 | 239 | 合并简化，协议完整 |
+| Tool calling | 482 | ~200 | 简化版，待增强 |
+| 14 Provider 总计 | ~15000+ | ~3500 | 每个都有实际实现 |
+
+## P0 — 核心健壮性 ✅ 部分完成
+
+- [x] **DeepSeek 流解析增强** — 2026-04-11 完成
   - `<think>` 标签缓冲区（think/thought/thinking 多标签支持）
-  - JUNK_TOKENS 过滤（`<｜end▁of▁thinking｜>` 等）
-  - reasoning_content 字段正确分流
+  - JUNK_TOKENS 过滤（`<｜end▁of▁thinking｜>`, `<|endoftext|>` 等）
+  - malformed think 标签处理（`\n?think\s*>`）
+  - 递归 flushBuffer 处理同 chunk 内多标签
+  - `lastAngle===0` 缓冲安全（不丢弃 `<` 前缀）
   - parent_message_id 追踪保持会话连续性
   - 参考: `openclaw-zero-token/src/zero-token/streams/deepseek-web-stream.ts`
 
 - [ ] **Claude 流解析增强** — 移植原版 507 行流解析：
-  - content_block_delta 类型处理
-  - thinking 内容分离
+  - content_block_delta 类型处理 ✅ 已有基础版
+  - thinking 内容分离 ✅ 已有基础版
+  - message_start/message_delta 事件处理（待增强）
   - 参考: `openclaw-zero-token/src/zero-token/streams/claude-web-stream.ts`
 
-- [ ] **Kimi Connect-JSON 帧解析增强** — 移植原版 415 行：
-  - 完整的二进制帧协议解析（0x00 + 4-byte BE length + JSON）
-  - op 字段处理（append/set）
-  - thinking 块支持
+- [ ] **Kimi Connect-JSON 帧解析增强** — ✅ 基础版已完整
+  - 二进制帧协议（0x00 + 4-byte BE length + JSON）✅
+  - op 字段处理（append/set）✅
+  - thinking 块支持 ✅
   - 参考: `openclaw-zero-token/src/zero-token/streams/kimi-web-stream.ts`
 
-## P1 — Auth 自动化
+## P1 — Auth 自动化 ✅ 部分完成
 
-- [ ] **Chrome 启动脚本** — 参考 `start-chrome-debug.sh`，创建 `scripts/start-chrome.sh`
-  - 自动检测 Chrome/Chromium 路径
-  - 带 `--remote-debugging-port` 启动
-  - 跨平台支持（macOS/Linux/WSL）
+- [x] **Chrome 启动脚本** — 2026-04-11 完成
+  - `scripts/start-chrome.sh`
+  - 自动检测 Chrome/Chromium 路径（macOS/Linux/WSL/Deepin）
+  - 带 `--remote-debugging-port=9222` 启动
+  - 自动打开 9 个平台登录页
 
-- [ ] **Onboard Auth Wizard** — 参考 `onboard.sh webauth`，创建 `scripts/onboard.sh`
-  - 通过 CDP 连接 Chrome
-  - 自动截获各平台 Cookie/Bearer Token
-  - 写入 config.yaml auth 字段
-  - 参考: `openclaw-zero-token/src/zero-token/providers/*-web-auth.ts`
+- [x] **Onboard Auth Wizard** — 2026-04-11 完成
+  - `scripts/onboard.sh`
+  - 通过 CDP WebSocket 连接 Chrome
+  - 自动截获各平台 Cookie + Bearer Token
+  - 输出 config.yaml 格式的 auth 配置
 
-- [ ] **各平台 Auth 模块移植** — 每个 provider 的认证截获逻辑：
+- [ ] **各平台 Auth 模块移植** — 待开发（需要 playwright-core 深度集成）
   - [ ] deepseek-web-auth.ts（18KB — PoW challenge + session）
   - [ ] claude-web-auth.ts（6KB — OrgId 自动发现）
   - [ ] kimi-web-auth.ts（4KB — kimi-auth token 提取）
@@ -103,4 +129,15 @@
 - [x] OpenAI 兼容端点（/v1/chat/completions, /v1/models, /health）
 - [x] OpenAI-compat 通用 Provider（Ollama/vLLM 等）
 - [x] Docker + docker-compose 部署配置
-- [x] TypeScript 编译通过 + 构建成功
+- [x] TypeScript 编译通过 + 构建成功（tsc + tsdown）
+- [x] DeepSeek 流解析增强（think 标签缓冲、JUNK_TOKENS、malformed 标签）
+- [x] Chrome 调试模式启动脚本（scripts/start-chrome.sh）
+- [x] Auth 凭据截获向导（scripts/onboard.sh）
+
+## 源码参考
+
+openclaw-zero-token 关键文件路径：
+- `src/zero-token/providers/*-web-auth.ts` — 各平台认证截获
+- `src/zero-token/providers/*-web-client.ts` — 各平台 API 客户端
+- `src/zero-token/streams/*-web-stream.ts` — 各平台流解析器
+- `src/zero-token/tool-calling/` — 工具调用中间件（4 个文件）
