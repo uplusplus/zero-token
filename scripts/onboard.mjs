@@ -7,6 +7,7 @@ import { createConnection } from 'node:net';
 import { readFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createInterface } from 'node:readline';
 import { WebSocket } from 'ws';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -196,28 +197,24 @@ async function extractBearer(cdpUrl, domain) {
 
 // ─── Interactive selection (stdin) ─────────────────────────────
 function askSelection() {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
     process.stdout.write('\nProviders:\n');
     PROVIDERS.forEach((p, i) => {
       process.stdout.write(`  [${String(i + 1).padStart(2)}] ${p.name} (${p.id})\n`);
     });
-    process.stdout.write(`  [ 0] ALL\n`);
-    process.stdout.write(`\nSelect (comma-separated numbers, or 0 for all): `);
+    process.stdout.write(`  [ 0] ALL\n\n`);
 
-    const onLine = (line) => {
-      process.stdin.removeListener('line', onLine);
-      process.stdin.pause();
-      const input = line.trim();
+    rl.question('Select (comma-separated numbers, or 0 for all): ', (answer) => {
+      rl.close();
+      const input = answer.trim();
       if (input === '0' || input === '') {
         resolve(PROVIDERS.map(p => p.id));
       } else {
         const indices = input.split(/[,\s]+/).map(Number).filter(n => n >= 1 && n <= PROVIDERS.length);
         resolve(indices.map(i => PROVIDERS[i - 1].id));
       }
-    };
-    process.stdin.setEncoding('utf-8');
-    process.stdin.resume();
-    process.stdin.once('line', onLine);
+    });
   });
 }
 
@@ -333,12 +330,10 @@ async function main() {
   await updateConfig(results);
 
   console.log('==========================================');
-  console.log('\nRestart gateway (start.bat [7]) to apply.');
-  process.stdin.pause();
+  console.log('\nRestart gateway (start.bat [7]).');
 }
 
 main().catch(err => {
   console.error(`\n[ERROR] ${err.message}`);
-  process.stdin.pause();
   process.exit(1);
 });
