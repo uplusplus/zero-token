@@ -171,68 +171,87 @@ BrowserManager 启动/连接 Chrome → CDP WebSocket URL
 
 ## 开发进度
 
-### Phase 1 — 项目脚手架 ✅
+> 详细 TODO 见 [TODO.md](./TODO.md)。总体完成度约 **75%**。
 
-- [x] 初始化项目：`package.json` + `tsconfig.json`
-- [x] 设计配置格式 `config.yaml`（providers 启用列表、browser profile、server port）
-- [x] 定义核心类型：`Provider`, `Model`, `ChatMessage`, `ChatCompletionChunk`
-- [x] 搭建 HTTP 服务骨架（Hono），监听端口，健康检查端点
+### 进度总览 (2026-04-11)
 
-### Phase 2 — 浏览器管理层 ✅
+| 阶段 | 状态 | 完成度 |
+|------|------|--------|
+| 基础架构 (脚手架/Browser/HTTP/配置) | ✅ 完成 | 100% |
+| Provider 基础实现 (14 个) | ✅ 完成 | 100% |
+| P0 流解析增强 | 🔄 进行中 | 40% (仅 DeepSeek ✅) |
+| P1 Auth 自动化 | 🔄 进行中 | 30% (脚本 ✅, Auth 模块待开发) |
+| P2 功能增强 | ⏳ 待开发 | 0% |
+| P3 测试部署 | ⏳ 待开发 | 0% |
 
-- [x] Chrome 启动 / CDP 连接 / Profile 管理（`src/browser/cdp.ts`, `executables.ts`, `manager.ts`）
-- [x] 独立实现，无 OpenClaw 内部依赖
-- [x] 支持 headless / launch / attach 三种模式
+### 已完成 ✅
 
-### Phase 3 — Provider 迁移 ✅
-
-- [x] 定义独立的 `ProviderAdapter` 接口（替代 OpenClaw 内部类型）
-- [x] DeepSeek — PoW (SHA256 + DeepSeekHashV1 WASM) + SSE 流解析
-- [x] Claude — Cookie + OrgId 自动发现 + SSE
-- [x] Kimi — Connect-JSON 二进制帧协议
-- [x] Doubao — sessionid + ttwid 认证 + SSE
-- [x] Xiaomi MiMo — Cookie + Bearer REST API
-- [x] Qwen (国际) — Playwright CDP + page.evaluate fetch
-- [x] Qwen (国内) — XSRF Token + Playwright page.evaluate
-- [x] GLM (智谱) — X-Sign/Nonce/Timestamp 签名 + Playwright
-- [x] GLM (国际) — DOM 交互 (textarea input + 轮询)
-- [x] Perplexity — DOM 交互 (contenteditable input + 轮询)
-- [x] ChatGPT Web — Sentinel token + DOM fallback
-- [x] Gemini Web — DOM 交互 (多选择器策略)
-- [x] Grok Web — REST API + DOM fallback
-- [x] OpenAI-compat — 通用 provider (Ollama/vLLM/OpenRouter/Together 等 12 平台)
-
-### Phase 4 — Stream 解析器 ✅
-
-- [x] 统一 `StreamCallbacks` 输出格式（onText / onReasoning / onToolCall / onDone / onError）
-- [x] SSE 流解析器（DeepSeek / Claude / Doubao / OpenAI-compat）
-- [x] Connect-JSON 流解析器（Kimi）
-- [x] reasoning_content 字段支持
-- [x] 统一输出转为 OpenAI SSE chunk 格式
-
-### Phase 5 — OpenAI 兼容接口 ✅
-
-- [x] `POST /v1/chat/completions`（SSE streaming + non-streaming）
-- [x] `GET /v1/models`（返回所有已配置 provider 的可用模型）
-- [x] `GET /health`（健康检查 + provider/model 列表）
-- [x] 消息格式转换层：OpenAI `messages[]` → 各平台内部格式
-- [x] 错误处理：OpenAI error schema
-
-### Phase 6 — 工具调用 ✅
-
-- [x] Prompt 注入式工具调用中间件
-- [x] 支持中文/英文模板、严格模式
-- [x] 工具调用提取（fenced JSON / bare JSON / XML）
-- [x] 关键词检测避免无谓注入
-
-### Phase 7 — 收尾与测试 ✅
-
-- [x] config.yaml 包含所有 15 个 provider 配置模板（13 web + 1 Manus API + OpenAI-compat）
-- [x] 安装依赖并编译测试（tsc + tsdown build 通过）
+- [x] 项目脚手架：`package.json` + `tsconfig.json` + `tsdown`
+- [x] 配置系统：`config.yaml`（YAML + Zod 校验）
+- [x] 核心类型：`ProviderAdapter`, `ModelDefinition`, `ChatMessage`, `StreamCallbacks`
+- [x] HTTP 服务：Hono + OpenAI 兼容端点（`/v1/chat/completions`, `/v1/models`, `/health`）
+- [x] 浏览器管理：CDP 连接 / Chrome 健康检查 / headless|launch|attach 三种模式
+- [x] 14 个 Provider 基础实现（每个都有实际可用代码）
+- [x] 基础流解析器：SSE + Connect-JSON（通用版，不含平台特定标签解析）
+- [x] Tool calling 中间件：CN/EN/Strict 三种模板 + 6 种工具定义
+- [x] OpenAI-compat 通用 Provider（Ollama/vLLM/OpenRouter/Together/Manus 等）
+- [x] DeepSeek 流解析增强：`<think>` 标签缓冲、JUNK_TOKENS 过滤、malformed 标签处理
+- [x] Chrome 调试启动脚本 `scripts/start-chrome.sh`
+- [x] Auth 凭据截获向导 `scripts/onboard.sh`
 - [x] Dockerfile + docker-compose
-- [x] TypeScript 类型修复（DOM types in page.evaluate）
-- [ ] 端到端测试：至少验证 3 个 provider（DeepSeek, Claude, Qwen）
+
+### 待开发 ❌
+
+#### P0 — 流解析增强（影响响应质量）
+
+只有 DeepSeek 完成了完整移植，其余 provider 使用通用 SSE 解析器，缺少：
+
+- [ ] **通用 `TagAwareStreamParser`** — think/thought/thinking 多标签、JUNK_TOKENS、malformed 标签、递归 flushBuffer
+- [ ] **Claude** — content_block_start/delta/stop 事件序列、message_start/message_delta、thinking 分离（原版 507 行）
+- [ ] **Kimi** — op 字段处理（append/set）、thinking 块、完整消息解析
+- [ ] **Doubao** — 完整流解析（原版 19KB）
+- [ ] **ChatGPT** — Sentinel token 处理（原版 15KB）
+- [ ] **Gemini** — 多选择器 DOM 解析（原版 13KB）
+- [ ] **Grok** — REST API + DOM fallback（原版 15KB）
+- [ ] **GLM / GLM Intl** — X-Sign 签名 + DOM 交互（原版 19KB + 16KB）
+- [ ] **Qwen / Qwen CN** — page.evaluate fetch 解析（原版 14KB + 16KB）
+- [ ] **Perplexity** — DOM 交互（原版 7KB）
+- [ ] **Xiaomi MiMo** — REST SSE 解析（原版 16KB）
+
+#### P1 — Auth 自动化模块
+
+`src/auth/` 目录待创建，共 13 个文件：
+
+- [ ] `deepseek-web-auth.ts`（18KB — PoW challenge + session）
+- [ ] `claude-web-auth.ts`（6KB — OrgId 自动发现）
+- [ ] `kimi-web-auth.ts`（4KB — kimi-auth token 提取）
+- [ ] `doubao-web-auth.ts`（6KB — sessionid + ttwid）
+- [ ] `xiaomimo-web-auth.ts`（9KB — Cookie + Bearer）
+- [ ] `qwen-web-auth.ts`（6KB — CDP + session token）
+- [ ] `qwen-cn-web-auth.ts`（7KB — XSRF + deviceId）
+- [ ] `glm-web-auth.ts`（3KB）
+- [ ] `glm-intl-web-auth.ts`（5KB）
+- [ ] `perplexity-web-auth.ts`（4KB）
+- [ ] `chatgpt-web-auth.ts`（6KB — session + sentinel）
+- [ ] `gemini-web-auth.ts`（3KB）
+- [ ] `grok-web-auth.ts`（3KB）
+
+#### P3 — 测试与部署
+
+- [ ] 端到端测试（至少验证 DeepSeek, Claude, Qwen）
 - [ ] 并发 & 会话隔离测试
+- [ ] Docker 构建验证
+- [ ] CI 配置（GitHub Actions）
+
+### 源码对比
+
+| 模块 | 原版行数 | llmgw 行数 | 说明 |
+|------|---------|-----------|------|
+| DeepSeek client+stream | 1179 | 377 | 核心逻辑已移植，流解析已增强 |
+| Claude client+stream | 729 | 197 | 基础版可用，流解析待增强 |
+| Kimi client+stream | 747 | 239 | 基础版可用，Connect-JSON 协议完整 |
+| Tool calling | 482 | ~200 | CN/EN/Strict 模板已移植 |
+| 14 Provider 总计 | ~15000+ | ~3500 | 每个都有基础实现 |
 
 ---
 
