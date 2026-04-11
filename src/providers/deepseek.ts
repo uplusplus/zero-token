@@ -140,46 +140,71 @@ export class DeepSeekProvider implements ProviderAdapter {
       const JUNK_TOKENS = new Set([
         "<｜end▁of▁thinking｜>", "<|end▁of▁thinking|>",
         "<｜end_of_thinking｜>", "<|end_of_thinking|>",
+        "<|endoftext|>",
       ]);
 
       let currentMode: string = "text";
       let tagBuffer = "";
 
-      const flushBuffer = () => {
+      const emitText = (text: string) => {
+        if (!text) return;
+        if (currentMode === "thinking") callbacks.onReasoning(text);
+        else callbacks.onText(text);
+      };
+
+      const flushBuffer = (): void => {
         if (!tagBuffer) return;
-        const thinkStart = tagBuffer.match(/<(?:think(?:ing)?|thought)\b[^<>]*>/i);
-        const thinkEnd = tagBuffer.match(/<\/(?:think(?:ing)?|thought)\b[^<>]*>/i);
 
-        const tags = [
-          { type: "think_start" as const, idx: thinkStart?.index ?? -1, len: thinkStart?.[0].length ?? 0 },
-          { type: "think_end" as const, idx: thinkEnd?.index ?? -1, len: thinkEnd?.[0].length ?? 0 },
-        ].filter((t) => t.idx !== -1).sort((a, b) => a.idx - b.idx);
+        // Match all supported tags in priority order
+        const thinkStartMatch = tagBuffer.match(/<(?:think(?:ing)?|thought)\b[^<>]*>/i);
+        const thinkEndMatch = tagBuffer.match(/<\/(?:think(?:ing)?|thought)\b[^<>]*>/i);
+        const malformedThinkMatch = tagBuffer.match(/\n?think\s*>/i);
 
-        if (tags.length === 0) {
+        const candidates = [
+          {
+            type: "think_start" as const,
+            idx: thinkStartMatch?.index ?? -1,
+            len: thinkStartMatch?.[0].length ?? 0,
+          },
+          {
+            type: "think_end" as const,
+            idx: thinkEndMatch?.index ?? -1,
+            len: thinkEndMatch?.[0].length ?? 0,
+          },
+          {
+            // Malformed: bare "think>" without '<' prefix — treat as start
+            type: "think_start" as const,
+            idx: malformedThinkMatch?.index ?? -1,
+            len: malformedThinkMatch?.[0].length ?? 0,
+          },
+        ]
+          .filter((t) => t.idx !== -1)
+          .sort((a, b) => a.idx - b.idx);
+
+        if (candidates.length === 0) {
+          // No complete tag found. Emit safe part (before last '<').
           const lastAngle = tagBuffer.lastIndexOf("<");
           if (lastAngle === -1) {
-            if (currentMode === "thinking") callbacks.onReasoning(tagBuffer);
-            else callbacks.onText(tagBuffer);
+            emitText(tagBuffer);
             tagBuffer = "";
           } else if (lastAngle > 0) {
-            const text = tagBuffer.slice(0, lastAngle);
-            if (currentMode === "thinking") callbacks.onReasoning(text);
-            else callbacks.onText(text);
+            emitText(tagBuffer.slice(0, lastAngle));
             tagBuffer = tagBuffer.slice(lastAngle);
           }
+          // lastAngle === 0: buffer starts with '<', keep in buffer for next chunk
           return;
         }
 
-        const first = tags[0];
+        const first = candidates[0];
         const before = tagBuffer.slice(0, first.idx);
         tagBuffer = tagBuffer.slice(first.idx + first.len);
 
-        if (before) {
-          if (currentMode === "thinking") callbacks.onReasoning(before);
-          else callbacks.onText(before);
-        }
+        if (before) emitText(before);
         if (first.type === "think_start") currentMode = "thinking";
         else if (first.type === "think_end") currentMode = "text";
+
+        // Recurse — there may be more tags in the remaining buffer
+        flushBuffer();
       };
 
       for await (const jsonStr of readSSEStream(res.body)) {
@@ -224,11 +249,8 @@ export class DeepSeekProvider implements ProviderAdapter {
         } catch { /* ignore partial JSON */ }
       }
 
-      // Flush remaining
-      if (tagBuffer) {
-        if (currentMode === "thinking") callbacks.onReasoning(tagBuffer);
-        else callbacks.onText(tagBuffer);
-      }
+      // Flush remaining buffer
+      if (tagBuffer) emitText(tagBuffer);
 
       callbacks.onDone();
     } catch (err) {
