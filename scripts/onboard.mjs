@@ -213,24 +213,29 @@ async function updateConfig(results) {
     yaml = await readFile(configPath, 'utf-8');
   } catch {
     console.log(`\n✗ config.yaml not found at ${configPath}`);
-    console.log('  Create it first, then re-run.');
     return false;
   }
 
-  let updated = yaml;
   let count = 0;
+  const lines = yaml.split('\n');
 
   for (const r of results) {
-    // Match: - id: xxx-web\n    ...\n    auth: '...'
-    const escaped = r.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(
-      `(- id: ${escaped}\\n(?:.*\\n)*?    )enabled: false(\\n(?:.*\\n)*?    auth: ')[^']*(')`,
-      ''
-    );
     const authJson = buildAuthJson(r.cookie, r.bearer);
-    if (re.test(updated)) {
-      updated = updated.replace(re, `$1enabled: true$2${authJson}$3`);
-      count++;
+    // Find the - id: <provider> line
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === `- id: ${r.id}`) {
+        // Update enabled and auth in the next ~5 lines
+        for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+          if (/^\s+enabled:/.test(lines[j])) {
+            lines[j] = lines[j].replace(/enabled:\s*\w+/, 'enabled: true');
+          }
+          if (/^\s+auth:/.test(lines[j])) {
+            lines[j] = lines[j].replace(/auth:\s*'.*'/, `auth: '${authJson}'`);
+          }
+        }
+        count++;
+        break;
+      }
     }
   }
 
@@ -240,8 +245,8 @@ async function updateConfig(results) {
   }
 
   const { writeFile } = await import('node:fs/promises');
-  await writeFile(configPath, updated, 'utf-8');
-  console.log(`\n✓ Updated ${count} provider(s) in config.yaml`);
+  await writeFile(configPath, lines.join('\n'), 'utf-8');
+  console.log(`✓ Updated ${count} provider(s) in config.yaml`);
   return true;
 }
 
