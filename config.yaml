@@ -11,7 +11,7 @@ browser:
     default:
       name: "default"
       cdpPort: 9222
-      mode: headless  # launch | headless | attach
+      mode: attach  # attach: 用已登录的 Chrome（推荐） | launch: 启动新窗口 | headless: 无界面
 
 providers:
   # ── Web-based providers (cookie auth, no API key needed) ──
