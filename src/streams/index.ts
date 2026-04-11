@@ -7,3 +7,6 @@
 
 export { parseSSEStream, parseConnectJSONStream } from "./parsers.js";
 export type { StreamChunk } from "./parsers.js";
+
+export { parseClaudeSSEStream, createTagAwareBuffer } from "./claude-parser.js";
+export type { TagAwareBuffer } from "./claude-parser.js";

@@ -171,17 +171,17 @@ BrowserManager 启动/连接 Chrome → CDP WebSocket URL
 
 ## 开发进度
 
-> 详细 TODO 见 [TODO.md](./TODO.md)。总体完成度约 **75%**。
+> 详细 TODO 见 [TODO.md](./TODO.md)。总体完成度约 **82%**。
 
-### 进度总览 (2026-04-11)
+### 进度总览 (2026-04-11 13:00)
 
 | 阶段 | 状态 | 完成度 |
 |------|------|--------|
 | 基础架构 (脚手架/Browser/HTTP/配置) | ✅ 完成 | 100% |
 | Provider 基础实现 (14 个) | ✅ 完成 | 100% |
-| P0 流解析增强 | 🔄 进行中 | 40% (仅 DeepSeek ✅) |
-| P1 Auth 自动化 | 🔄 进行中 | 30% (脚本 ✅, Auth 模块待开发) |
-| P2 功能增强 | ⏳ 待开发 | 0% |
+| P0 流解析增强 | 🔄 进行中 | 55% (DeepSeek ✅, Claude ✅ enhanced, Kimi ✅) |
+| P1 Auth 自动化 | ✅ 完成 | 100% (13/13 模块已创建) |
+| P2 功能增强 | ⏳ 待开发 | 10% (TagAwareBuffer 通用化) |
 | P3 测试部署 | ⏳ 待开发 | 0% |
 
 ### 已完成 ✅
@@ -196,6 +196,9 @@ BrowserManager 启动/连接 Chrome → CDP WebSocket URL
 - [x] Tool calling 中间件：CN/EN/Strict 三种模板 + 6 种工具定义
 - [x] OpenAI-compat 通用 Provider（Ollama/vLLM/OpenRouter/Together/Manus 等）
 - [x] DeepSeek 流解析增强：`<think>` 标签缓冲、JUNK_TOKENS 过滤、malformed 标签处理
+- [x] Claude 流解析增强：content_block 事件序列、thinking 分离、tool_call XML 标签
+- [x] TagAwareBuffer 通用标签解析器：think/thought/thinking + tool_call 多标签支持
+- [x] Auth 自动化模块全部完成 (13 个)：`src/auth/` + index.ts 统一导出
 - [x] Chrome 调试启动脚本 `scripts/start-chrome.sh`
 - [x] Auth 凭据截获向导 `scripts/onboard.sh`
 - [x] Dockerfile + docker-compose
@@ -204,11 +207,11 @@ BrowserManager 启动/连接 Chrome → CDP WebSocket URL
 
 #### P0 — 流解析增强（影响响应质量）
 
-只有 DeepSeek 完成了完整移植，其余 provider 使用通用 SSE 解析器，缺少：
+DeepSeek ✅, Claude ✅, Kimi ✅ 已完成。其余 provider 使用通用 SSE 解析器，缺少平台特定处理：
 
-- [ ] **通用 `TagAwareStreamParser`** — think/thought/thinking 多标签、JUNK_TOKENS、malformed 标签、递归 flushBuffer
-- [ ] **Claude** — content_block_start/delta/stop 事件序列、message_start/message_delta、thinking 分离（原版 507 行）
-- [ ] **Kimi** — op 字段处理（append/set）、thinking 块、完整消息解析
+- [x] **通用 `TagAwareStreamParser`** ✅ — think/thought/thinking 多标签 + tool_call 标签
+- [x] **Claude** ✅ — content_block 事件序列、thinking 分离、tool_call XML 标签
+- [x] **Kimi** ✅ — op 字段处理、thinking 块、二进制帧协议
 - [ ] **Doubao** — 完整流解析（原版 19KB）
 - [ ] **ChatGPT** — Sentinel token 处理（原版 15KB）
 - [ ] **Gemini** — 多选择器 DOM 解析（原版 13KB）
@@ -218,23 +221,10 @@ BrowserManager 启动/连接 Chrome → CDP WebSocket URL
 - [ ] **Perplexity** — DOM 交互（原版 7KB）
 - [ ] **Xiaomi MiMo** — REST SSE 解析（原版 16KB）
 
-#### P1 — Auth 自动化模块
+#### P2 — 功能增强
 
-`src/auth/` 目录待创建，共 13 个文件：
-
-- [ ] `deepseek-web-auth.ts`（18KB — PoW challenge + session）
-- [ ] `claude-web-auth.ts`（6KB — OrgId 自动发现）
-- [ ] `kimi-web-auth.ts`（4KB — kimi-auth token 提取）
-- [ ] `doubao-web-auth.ts`（6KB — sessionid + ttwid）
-- [ ] `xiaomimo-web-auth.ts`（9KB — Cookie + Bearer）
-- [ ] `qwen-web-auth.ts`（6KB — CDP + session token）
-- [ ] `qwen-cn-web-auth.ts`（7KB — XSRF + deviceId）
-- [ ] `glm-web-auth.ts`（3KB）
-- [ ] `glm-intl-web-auth.ts`（5KB）
-- [ ] `perplexity-web-auth.ts`（4KB）
-- [ ] `chatgpt-web-auth.ts`（6KB — session + sentinel）
-- [ ] `gemini-web-auth.ts`（3KB）
-- [ ] `grok-web-auth.ts`（3KB）
+- [ ] Tool calling 中间件完善（CN/EN/Strict 模板增强）
+- [ ] 其余 provider 流解析增强（见 P0 列表）
 
 #### P3 — 测试与部署
 
@@ -248,8 +238,9 @@ BrowserManager 启动/连接 Chrome → CDP WebSocket URL
 | 模块 | 原版行数 | llmgw 行数 | 说明 |
 |------|---------|-----------|------|
 | DeepSeek client+stream | 1179 | 377 | 核心逻辑已移植，流解析已增强 |
-| Claude client+stream | 729 | 197 | 基础版可用，流解析待增强 |
-| Kimi client+stream | 747 | 239 | 基础版可用，Connect-JSON 协议完整 |
+| Claude client+stream | 729 | ~250 | 流解析增强完成，支持 content_block 事件 |
+| Kimi client+stream | 747 | 239 | 基础版完整，Connect-JSON 协议完整 |
+| Auth 模块 (13个) | ~85KB | ~25KB | 基于 BrowserManager CDP，统一 runAuthFlow |
 | Tool calling | 482 | ~200 | CN/EN/Strict 模板已移植 |
 | 14 Provider 总计 | ~15000+ | ~3500 | 每个都有基础实现 |
 

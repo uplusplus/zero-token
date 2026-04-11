@@ -2,17 +2,17 @@
 
 从 openclaw-zero-token 提取核心功能，补全 llmgw 缺失部分。
 
-## 进度总览 (2026-04-11)
+## 进度总览 (2026-04-11 13:00)
 
 | 阶段 | 状态 | 完成度 |
 |------|------|--------|
 | 基础架构 | ✅ 完成 | 100% |
-| P0 核心健壮性 | 🔄 进行中 | 40% (DeepSeek ✅, Claude/Kimi 基础可用) |
-| P1 Auth 自动化 | 🔄 进行中 | 30% (脚本 ✅, Auth 模块待开发) |
-| P2 功能增强 | ⏳ 待开发 | 0% |
+| P0 核心健壮性 | 🔄 进行中 | 55% (DeepSeek ✅, Claude ✅ enhanced, Kimi ✅) |
+| P1 Auth 自动化 | ✅ 完成 | 100% (13/13 模块已创建) |
+| P2 功能增强 | ⏳ 待开发 | 10% (tag-aware parser 通用化完成) |
 | P3 测试部署 | ⏳ 待开发 | 0% |
 
-**总体完成度: ~75%** (含基础架构 85% + 已完成的增强)
+**总体完成度: ~82%** (含基础架构 85% + Auth 100% + 流解析增强)
 
 ## 源码对比 (openclaw-zero-token vs llmgw)
 
@@ -35,11 +35,19 @@
   - parent_message_id 追踪保持会话连续性
   - 参考: `openclaw-zero-token/src/zero-token/streams/deepseek-web-stream.ts`
 
-- [ ] **Claude 流解析增强** — 移植原版 507 行流解析：
-  - content_block_delta 类型处理 ✅ 已有基础版
-  - thinking 内容分离 ✅ 已有基础版
-  - message_start/message_delta 事件处理（待增强）
+- [x] **Claude 流解析增强** — 2026-04-11 完成
+  - content_block_start/delta/end 事件序列处理
+  - message_start/message_delta/message_end 事件
+  - thinking 内容分离（通过 TagAwareBuffer）
+  - tool_call XML 标签提取
   - 参考: `openclaw-zero-token/src/zero-token/streams/claude-web-stream.ts`
+
+- [x] **TagAwareBuffer 通用标签解析** — 2026-04-11 完成
+  - think/thought/thinking 多标签支持
+  - tool_call XML 标签解析
+  - 递归 flushBuffer 处理同 chunk 内多标签
+  - `<` 前缀缓冲安全（不丢弃）
+  - 可复用于所有需要标签解析的 provider
 
 - [ ] **Kimi Connect-JSON 帧解析增强** — ✅ 基础版已完整
   - 二进制帧协议（0x00 + 4-byte BE length + JSON）✅
@@ -47,7 +55,7 @@
   - thinking 块支持 ✅
   - 参考: `openclaw-zero-token/src/zero-token/streams/kimi-web-stream.ts`
 
-## P1 — Auth 自动化 ✅ 部分完成
+## P1 — Auth 自动化 ✅ 已完成
 
 - [x] **Chrome 启动脚本** — 2026-04-11 完成
   - `scripts/start-chrome.sh`
@@ -61,20 +69,24 @@
   - 自动截获各平台 Cookie + Bearer Token
   - 输出 config.yaml 格式的 auth 配置
 
-- [ ] **各平台 Auth 模块移植** — 待开发（需要 playwright-core 深度集成）
-  - [ ] deepseek-web-auth.ts（18KB — PoW challenge + session）
-  - [ ] claude-web-auth.ts（6KB — OrgId 自动发现）
-  - [ ] kimi-web-auth.ts（4KB — kimi-auth token 提取）
-  - [ ] doubao-web-auth.ts（6KB — sessionid + ttwid）
-  - [ ] xiaomimo-web-auth.ts（9KB — Cookie + Bearer）
-  - [ ] qwen-web-auth.ts（6KB — CDP + session token）
-  - [ ] qwen-cn-web-auth.ts（7KB — XSRF + deviceId）
-  - [ ] glm-web-auth.ts（3KB — Cookie）
-  - [ ] glm-intl-web-auth.ts（5KB — Cookie）
-  - [ ] perplexity-web-auth.ts（4KB — Cookie）
-  - [ ] chatgpt-web-auth.ts（6KB — session + sentinel）
-  - [ ] gemini-web-auth.ts（3KB — Cookie）
-  - [ ] grok-web-auth.ts（3KB — Cookie）
+- [x] **Auth 基础框架** — 2026-04-11 完成
+  - `src/auth/base.ts` — runAuthFlow, getCookies, formatCookies 通用工具
+
+- [x] **各平台 Auth 模块** — 2026-04-11 完成 (13/13)
+  - [x] `deepseek-web-auth.ts` — Cookie + Bearer + localStorage token
+  - [x] `claude-web-auth.ts` — sessionKey (sk-ant-sid01/02)
+  - [x] `kimi-web-auth.ts` — Bearer (kimi-auth)
+  - [x] `doubao-web-auth.ts` — sessionid + ttwid
+  - [x] `xiaomimo-web-auth.ts` — Cookie + Bearer
+  - [x] `qwen-web-auth.ts` — CDP + session token
+  - [x] `qwen-cn-web-auth.ts` — XSRF + deviceId
+  - [x] `glm-web-auth.ts` — Cookie (chatglm.cn)
+  - [x] `glm-intl-web-auth.ts` — Cookie (z.ai)
+  - [x] `perplexity-web-auth.ts` — Cookie (next-auth)
+  - [x] `chatgpt-web-auth.ts` — session + access token
+  - [x] `gemini-web-auth.ts` — Cookie (Google SID/SSID)
+  - [x] `grok-web-auth.ts` — Cookie (auth_token)
+  - [x] `src/auth/index.ts` — 统一导出
 
 ## P2 — 功能增强
 
@@ -133,6 +145,9 @@
 - [x] DeepSeek 流解析增强（think 标签缓冲、JUNK_TOKENS、malformed 标签）
 - [x] Chrome 调试模式启动脚本（scripts/start-chrome.sh）
 - [x] Auth 凭据截获向导（scripts/onboard.sh）
+- [x] **Claude 流解析增强** — 2026-04-11（content_block 事件、thinking 分离、tool_call 标签）
+- [x] **TagAwareBuffer 通用标签解析器** — 2026-04-11（think/thought/thinking + tool_call）
+- [x] **Auth 模块全部完成 (13个)** — 2026-04-11（src/auth/ + index.ts 统一导出）
 
 ## 源码参考
 
