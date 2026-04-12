@@ -173,8 +173,10 @@ if ($LASTEXITCODE -ne 0) { npm install 2>&1 | Out-Null }
 Write-Ok "依赖安装完成"
 
 Write-Info "构建项目..."
-npx tsdown 2>&1 | Write-Host
-if ($LASTEXITCODE -ne 0) {
+$buildOut = & npx tsdown 2>&1
+$buildExit = $LASTEXITCODE
+$buildOut | ForEach-Object { Write-Host $_ }
+if ($buildExit -ne 0) {
     Write-Fail "构建失败"
     Read-Host "按 Enter 退出"
     exit 1
