@@ -202,9 +202,10 @@ echo +-------------------------------------+
 echo.
 
 set "CHROME_EXE="
-if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "CHROME_EXE=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
-if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "CHROME_EXE=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
-if exist "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" set "CHROME_EXE=%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"
+for %%C in (
+    "%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+    "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"
+) do if exist %%C set "CHROME_EXE=%%C"
 
 if not defined CHROME_EXE (
     echo [WARN] Chrome not found, skipping browser setup
