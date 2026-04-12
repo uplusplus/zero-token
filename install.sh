@@ -122,12 +122,15 @@ else
 fi
 
 info "安装依赖 ..."
-npm ci --production 2>/dev/null || npm install --production
+npm ci 2>/dev/null || npm install
 ok "依赖安装完成"
 
 info "构建项目 ..."
 npx tsdown
 ok "构建完成"
+
+# 清理 devDependencies，减小体积
+npm prune --production 2>/dev/null || true
 
 # ── 4. 默认配置 ──────────────────────────────────────────────
 if [ ! -f "config.yaml" ]; then
