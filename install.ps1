@@ -191,18 +191,16 @@ $ErrorActionPreference = $oldEAP
 # ── 6. Create start script ──────────────────────────────────────────
 $startBat = @"
 @echo off
-chcp 65001 >nul
 cd /d "$INSTALL_DIR"
 set SERVER_PORT=$SERVER_PORT
 set CDP_PORT=$CDP_PORT
 
 echo.
 echo +-------------------------------------+
-echo |       zero-token  Starting...       |
+echo ^|       zero-token  Starting...       ^|
 echo +-------------------------------------+
 echo.
 
-REM Start Chrome (debug mode)
 set "CHROME="
 for %%P in (
     "%ProgramFiles%\Google\Chrome\Application\chrome.exe"
@@ -214,34 +212,28 @@ for %%P in (
 
 if defined CHROME (
     echo [INFO] Starting Chrome (CDP port %CDP_PORT%)...
-    start "" %CHROME% --remote-debugging-port=%CDP_PORT% --user-data-dir="%USERPROFILE%\.zero-token\chrome-data" --no-first-run --no-default-browser-check --remote-allow-origins=* --no-sandbox
+    start "" "%CHROME%" --remote-debugging-port=%CDP_PORT% --user-data-dir="%USERPROFILE%\.zero-token\chrome-data" --no-first-run --no-default-browser-check --remote-allow-origins=* --no-sandbox
     timeout /t 3 /nobreak >nul
 
-    REM Open provider login pages
     echo [INFO] Opening Provider login pages...
-    for %%U in (
-        "https://chat.deepseek.com"
-        "https://claude.ai"
-        "https://kimi.com"
-        "https://doubao.com"
-        "https://xiaomimo.ai"
-        "https://chat.qwen.ai"
-        "https://chatglm.cn"
-        "https://chat.z.ai"
-        "https://perplexity.ai"
-        "https://chatgpt.com"
-        "https://gemini.google.com"
-        "https://grok.com"
-    ) do (
-        curl -s -o nul -X PUT "http://localhost:%CDP_PORT%/json/new?%%~U" 2>nul
-    )
+    start "" "%CHROME%" https://chat.deepseek.com
+    start "" "%CHROME%" https://claude.ai
+    start "" "%CHROME%" https://kimi.com
+    start "" "%CHROME%" https://doubao.com
+    start "" "%CHROME%" https://xiaomimo.ai
+    start "" "%CHROME%" https://chat.qwen.ai
+    start "" "%CHROME%" https://chatglm.cn
+    start "" "%CHROME%" https://chat.z.ai
+    start "" "%CHROME%" https://perplexity.ai
+    start "" "%CHROME%" https://chatgpt.com
+    start "" "%CHROME%" https://gemini.google.com
+    start "" "%CHROME%" https://grok.com
 
     echo.
     echo [INFO] Log in to the platforms you need in Chrome tabs
     echo [INFO] Press any key after logging in...
     pause >nul
 
-    REM Capture credentials
     echo.
     echo [INFO] Capturing login credentials...
     node scripts\onboard.mjs --all
@@ -249,9 +241,7 @@ if defined CHROME (
     echo [WARN] Chrome not found, skipping Web Provider login
 )
 
-REM Open health check page
 timeout /t 3 /nobreak >nul
-curl -s -o nul -X PUT "http://localhost:%CDP_PORT%/json/new?http://localhost:%SERVER_PORT%/health" 2>nul
 
 echo.
 echo [INFO] Starting zero-token service (port: %SERVER_PORT%)...
@@ -259,6 +249,7 @@ echo [INFO] Press Ctrl+C to stop
 echo.
 node dist\server.mjs
 "@
+
 $startBat | Out-File -FilePath "$INSTALL_DIR\start.bat" -Encoding ASCII
 
 # ── 7. Default config ──────────────────────────────────────────────
