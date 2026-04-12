@@ -173,26 +173,47 @@ CHROME_PID=""
 CHROME_DATA_DIR="/tmp/zero-token-chrome-data"
 
 if [ -n "$CHROME_PATH" ]; then
-  info "启动 Chrome（调试模式，非 headless）..."
+  # 检测是否有图形环境
+  HAS_DISPLAY=0
+  if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
+    HAS_DISPLAY=1
+  fi
+
+  info "启动 Chrome（调试模式）..."
   mkdir -p "$CHROME_DATA_DIR"
 
-  "$CHROME_PATH" \
-    --remote-debugging-port="$CDP_PORT" \
-    --user-data-dir="$CHROME_DATA_DIR" \
-    --no-first-run \
-    --no-default-browser-check \
-    --disable-background-networking \
-    --disable-sync \
-    --disable-translate \
-    --remote-allow-origins=* \
-    --no-sandbox \
-    --disable-dev-shm-usage \
-    &
-  CHROME_PID=$!
-  ok "Chrome 已启动 (PID: $CHROME_PID, CDP: http://localhost:$CDP_PORT)"
-  echo ""
-  echo -e "  ${YELLOW}请在 Chrome 窗口中登录你需要的平台（DeepSeek / Claude / ChatGPT 等）${NC}"
-  echo -e "  ${YELLOW}登录完成后，按任意键继续...${NC}"
+  CHROME_ARGS=(
+    --remote-debugging-port="$CDP_PORT"
+    --user-data-dir="$CHROME_DATA_DIR"
+    --no-first-run
+    --no-default-browser-check
+    --disable-background-networking
+    --disable-sync
+    --disable-translate
+    --remote-allow-origins=*
+    --no-sandbox
+    --disable-dev-shm-usage
+  )
+
+  if [ "$HAS_DISPLAY" -eq 0 ]; then
+    # 无图形环境（服务器/WSL），使用 headless + 远程调试
+    CHROME_ARGS+=(--headless --disable-gpu)
+    "$CHROME_PATH" "${CHROME_ARGS[@]}" &
+    CHROME_PID=$!
+    ok "Chrome 已启动 (headless 模式, PID: $CHROME_PID, CDP: http://localhost:$CDP_PORT)"
+    echo ""
+    echo -e "  ${YELLOW}无图形环境，使用 headless 模式${NC}"
+    echo -e "  ${YELLOW}请从本机浏览器打开 http://localhost:$CDP_PORT/json/version 确认 Chrome 已就绪${NC}"
+    echo -e "  ${YELLOW}凭据抓取将通过脚本自动完成，完成后按任意键继续...${NC}"
+  else
+    # 有图形环境，前台打开 Chrome 供交互登录
+    "$CHROME_PATH" "${CHROME_ARGS[@]}" &
+    CHROME_PID=$!
+    ok "Chrome 已启动 (PID: $CHROME_PID, CDP: http://localhost:$CDP_PORT)"
+    echo ""
+    echo -e "  ${YELLOW}请在 Chrome 窗口中登录你需要的平台（DeepSeek / Claude / ChatGPT 等）${NC}"
+    echo -e "  ${YELLOW}登录完成后，按任意键继续...${NC}"
+  fi
   read -n 1 -s -r
   echo ""
 else
