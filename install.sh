@@ -190,9 +190,10 @@ if [ -n "$CHROME_PATH" ]; then
   if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
     ok "Chrome 已在运行 (CDP: http://localhost:$CDP_PORT)，跳过启动"
   else
-    "$CHROME_PATH" "${CHROME_ARGS[@]}" &
+    mkdir -p "$CHROME_DATA_DIR"
+    "$CHROME_PATH" "${CHROME_ARGS[@]}" > /dev/null 2>&1 &
     CHROME_PID=$!
-    ok "Chrome 已启动 (PID: $CHROME_PID, CDP: http://localhost:$CDP_PORT)"
+    ok "Chrome 启动中 (PID: $CHROME_PID) ..."
 
     # 等待 Chrome CDP 就绪
     info "等待 Chrome 就绪 ..."
@@ -200,12 +201,18 @@ if [ -n "$CHROME_PATH" ]; then
       if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
         break
       fi
+      # 检查进程是否还活着
+      if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+        warn "Chrome 进程已退出"
+        CHROME_PID=""
+        break
+      fi
       sleep 1
     done
   fi
 
   if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
-    ok "Chrome CDP 就绪"
+    ok "Chrome CDP 就绪 (http://localhost:$CDP_PORT)"
 
     # 自动打开各 provider 登录页
     PROVIDER_URLS=(
@@ -225,13 +232,7 @@ if [ -n "$CHROME_PATH" ]; then
 
     info "自动打开 Provider 登录页 ..."
     for url in "${PROVIDER_URLS[@]}"; do
-      python3 -c "
-import json, http.client
-conn = http.client.HTTPConnection('localhost', $CDP_PORT)
-conn.request('PUT', '/json/new?$url')
-resp = conn.getresponse()
-conn.close()
-" 2>/dev/null || true
+      curl -sf -X PUT "http://localhost:$CDP_PORT/json/new?$url" > /dev/null 2>&1 || true
     done
     ok "已打开 ${#PROVIDER_URLS[@]} 个 Provider 登录页"
   else
