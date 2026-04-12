@@ -85,15 +85,72 @@ check_node() {
 
 check_node
 
-# ── 2. 安装 Chromium ─────────────────────────────────────────
-if command -v apt-get &>/dev/null; then
-  if ! command -v chromium &>/dev/null && ! command -v google-chrome &>/dev/null && ! command -v google-chrome-stable &>/dev/null; then
-    info "安装 Chromium ..."
-    apt-get install -y -qq chromium 2>/dev/null || apt-get install -y -qq chromium-browser 2>/dev/null || warn "Chromium 安装失败，Web 类 Provider 需要手动安装 Chrome"
-    ok "Chromium 就绪"
-  else
-    ok "Chrome/Chromium 已安装"
+# ── 2. 安装 & 检测 Chromium ──────────────────────────────────
+
+# 验证 Chrome 路径是否可用（排除损坏的 snap）
+verify_chrome() {
+  local path="$1"
+  [ ! -f "$path" ] && return 1
+  # snap 包：检查 snap revision 目录是否存在
+  if [[ "$path" == /snap/bin/* ]]; then
+    local snap_name
+    snap_name=$(basename "$path")
+    local current_rev
+    current_rev=$(readlink -f "/snap/$snap_name/current" 2>/dev/null || readlink "/snap/$snap_name/current" 2>/dev/null)
+    [ -z "$current_rev" ] && return 1
+    [ ! -f "/snap/$snap_name/$current_rev/meta/snap.yaml" ] && return 1
   fi
+  return 0
+}
+
+detect_chrome() {
+  # 优先使用 dpkg/原生安装的 chrome，其次 snap
+  local candidates=(
+    "/opt/google/chrome/google-chrome"
+    "/usr/bin/google-chrome"
+    "/usr/bin/google-chrome-stable"
+    "/usr/bin/chromium"
+    "/snap/bin/chromium"
+  )
+  for p in "${candidates[@]}"; do
+    if verify_chrome "$p"; then
+      echo "$p" && return
+    fi
+  done
+  # command -v 兜底
+  for cmd in google-chrome google-chrome-stable chromium chromium-browser; do
+    local p
+    p=$(command -v "$cmd" 2>/dev/null) || continue
+    if verify_chrome "$p"; then
+      echo "$p" && return
+    fi
+  done
+  echo ""
+}
+
+CHROME_PATH=$(detect_chrome)
+
+if [ -z "$CHROME_PATH" ]; then
+  # 没有可用的 Chrome，尝试安装 dpkg 版
+  if command -v apt-get &>/dev/null; then
+    warn "未找到可用的 Chrome/Chromium，尝试安装 ..."
+    apt-get update -qq 2>/dev/null || true
+    if apt-get install -y -qq chromium 2>/dev/null; then
+      CHROME_PATH="/usr/bin/chromium"
+      ok "Chromium 安装成功"
+    elif apt-get install -y -qq chromium-browser 2>/dev/null; then
+      CHROME_PATH=$(command -v chromium-browser)
+      ok "Chromium 安装成功"
+    else
+      warn "Chromium 安装失败，Web 类 Provider 不可用"
+    fi
+  fi
+fi
+
+if [ -n "$CHROME_PATH" ]; then
+  ok "Chrome: $CHROME_PATH"
+else
+  warn "Web 类 Provider 需要手动安装 Chrome/Chromium"
 fi
 
 # ── 3. 克隆 & 安装 ──────────────────────────────────────────
@@ -135,28 +192,7 @@ if [ ! -f "config.yaml" ]; then
   cp config.yaml.example config.yaml 2>/dev/null || true
 fi
 
-# ── 5. 检测 Chrome 路径 ──────────────────────────────────────
-detect_chrome() {
-  # 优先使用 dpkg/原生安装的 chrome，其次 snap
-  local linux_paths=(
-    "/opt/google/chrome/google-chrome"
-    "/usr/bin/google-chrome"
-    "/usr/bin/google-chrome-stable"
-    "/usr/bin/chromium"
-    "/snap/bin/chromium"
-  )
-  for p in "${linux_paths[@]}"; do
-    [ -f "$p" ] && echo "$p" && return
-  done
-  for cmd in google-chrome google-chrome-stable chromium chromium-browser; do
-    if command -v "$cmd" >/dev/null 2>&1; then
-      echo "$(command -v "$cmd")" && return
-    fi
-  done
-  echo ""
-}
-
-CHROME_PATH=$(detect_chrome)
+# ── 5. 启动准备 ──────────────────────────────────────────────
 
 # ── 完成 ─────────────────────────────────────────────────────
 echo ""
@@ -192,13 +228,20 @@ if [ -n "$CHROME_PATH" ]; then
   if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
     ok "Chrome 已在运行 (CDP: http://localhost:$CDP_PORT)，跳过启动"
   else
-    mkdir -p "$CHROME_DATA_DIR"
-    # 清理 singleton lock，避免"Opening in existing browser session"导致退出
-    rm -f "$CHROME_DATA_DIR/SingletonLock" "$CHROME_DATA_DIR/SingletonCookie" 2>/dev/null
+  # 杀掉残留 Chrome 进程（可能占着 CDP 端口）
+  if ss -tlnp 2>/dev/null | grep -q ":$CDP_PORT " || netstat -tlnp 2>/dev/null | grep -q ":$CDP_PORT "; then
+    warn "端口 $CDP_PORT 已被占用，清理残留 Chrome ..."
+    pkill -f "remote-debugging-port=$CDP_PORT" 2>/dev/null || true
+    sleep 2
+  fi
 
-    "$CHROME_PATH" "${CHROME_ARGS[@]}" > /dev/null 2>&1 &
-    CHROME_PID=$!
-    ok "Chrome 启动中 (PID: $CHROME_PID) ..."
+  mkdir -p "$CHROME_DATA_DIR"
+  # 清理 singleton lock，避免"Opening in existing browser session"导致退出
+  rm -f "$CHROME_DATA_DIR/SingletonLock" "$CHROME_DATA_DIR/SingletonCookie" 2>/dev/null
+
+  "$CHROME_PATH" "${CHROME_ARGS[@]}" > /dev/null 2>&1 &
+  CHROME_PID=$!
+  ok "Chrome 启动中 (PID: $CHROME_PID) ..."
 
     # 等待 Chrome CDP 就绪
     info "等待 Chrome 就绪 ..."
@@ -208,7 +251,9 @@ if [ -n "$CHROME_PATH" ]; then
       fi
       # 检查进程是否还活着
       if ! kill -0 "$CHROME_PID" 2>/dev/null; then
-        warn "Chrome 进程已退出"
+        warn "Chrome 进程已退出，尝试查看错误:"
+        # 重新启动一次并捕获错误输出
+        "$CHROME_PATH" "${CHROME_ARGS[@]}" 2>&1 | head -20 >&2 || true
         CHROME_PID=""
         break
       fi
