@@ -10,6 +10,7 @@
 
 # ── 配置 ─────────────────────────────────────────────────────
 $ErrorActionPreference = "Stop"
+chcp 65001 | Out-Null
 $REPO_URL = "https://github.com/uplusplus/zero-token.git"
 $INSTALL_DIR = "$env:USERPROFILE\zero-token"
 $MIN_NODE_VER = 22
@@ -190,6 +191,7 @@ $ErrorActionPreference = $oldEAP
 # ── 6. 创建启动脚本 ──────────────────────────────────────────
 $startBat = @"
 @echo off
+chcp 65001 >nul
 cd /d "$INSTALL_DIR"
 set SERVER_PORT=$SERVER_PORT
 set CDP_PORT=$CDP_PORT
