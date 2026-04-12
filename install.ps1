@@ -173,17 +173,12 @@ if ($LASTEXITCODE -ne 0) { npm install 2>&1 | Out-Null }
 Write-Ok "Dependencies installed"
 
 Write-Info "Build project..."
-$buildOut = & npx tsdown 2>&1
+$buildOut = & npx tsdown 2>$null
 $buildExit = $LASTEXITCODE
-$buildOut | ForEach-Object {
-    if ($_ -is [System.Management.Automation.ErrorRecord]) {
-        $msg = $_.Exception.Message
-        if ($msg -notmatch '^System\.Management\.Automation\.RemoteException$') { Write-Host $msg }
-    }
-    else { Write-Host $_ }
-}
+if ($buildOut) { $buildOut | Write-Host }
 if ($buildExit -ne 0) {
-    Write-Fail "Build failed"
+    Write-Fail "Build failed, running again to show errors..."
+    npx tsdown
     Read-Host "Press Enter to exit"
     exit 1
 }
