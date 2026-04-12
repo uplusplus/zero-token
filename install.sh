@@ -173,15 +173,6 @@ CHROME_PID=""
 CHROME_DATA_DIR="/tmp/zero-token-chrome-data"
 
 if [ -n "$CHROME_PATH" ]; then
-  # 检测是否有图形环境
-  HAS_DISPLAY=0
-  if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then
-    HAS_DISPLAY=1
-  fi
-
-  info "启动 Chrome（调试模式）..."
-  mkdir -p "$CHROME_DATA_DIR"
-
   CHROME_ARGS=(
     --remote-debugging-port="$CDP_PORT"
     --user-data-dir="$CHROME_DATA_DIR"
@@ -199,18 +190,9 @@ if [ -n "$CHROME_PATH" ]; then
   if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
     ok "Chrome 已在运行 (CDP: http://localhost:$CDP_PORT)，跳过启动"
   else
-    if [ "$HAS_DISPLAY" -eq 0 ]; then
-      # 无图形环境（服务器/WSL），使用 headless + 远程调试
-      CHROME_ARGS+=(--headless --disable-gpu)
-      "$CHROME_PATH" "${CHROME_ARGS[@]}" &
-      CHROME_PID=$!
-      ok "Chrome 已启动 (headless 模式, PID: $CHROME_PID, CDP: http://localhost:$CDP_PORT)"
-    else
-      # 有图形环境，前台打开 Chrome 供交互登录
-      "$CHROME_PATH" "${CHROME_ARGS[@]}" &
-      CHROME_PID=$!
-      ok "Chrome 已启动 (PID: $CHROME_PID, CDP: http://localhost:$CDP_PORT)"
-    fi
+    "$CHROME_PATH" "${CHROME_ARGS[@]}" &
+    CHROME_PID=$!
+    ok "Chrome 已启动 (PID: $CHROME_PID, CDP: http://localhost:$CDP_PORT)"
 
     # 等待 Chrome CDP 就绪
     info "等待 Chrome 就绪 ..."
@@ -220,10 +202,6 @@ if [ -n "$CHROME_PATH" ]; then
       fi
       sleep 1
     done
-
-    if ! curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
-      warn "Chrome 未就绪，跳过自动导航"
-    fi
   fi
 
   if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
@@ -256,21 +234,13 @@ conn.close()
 " 2>/dev/null || true
     done
     ok "已打开 ${#PROVIDER_URLS[@]} 个 Provider 登录页"
+  else
+    warn "Chrome CDP 未就绪，跳过自动导航"
   fi
 
   echo ""
-  if [ "$HAS_DISPLAY" -eq 0 ]; then
-    echo -e "  ${YELLOW}headless 模式：Chrome 已打开各 Provider 页面${NC}"
-    echo -e "  ${YELLOW}请通过 SSH 隧道或在 Windows 侧用 Chrome 访问 ${CDP_PORT} 端口完成登录${NC}"
-    echo -e "  ${YELLOW}或者：在本地电脑运行以下命令建立隧道后用浏览器操作：${NC}"
-    echo -e "  ${CYAN}  ssh -L 9222:localhost:${CDP_PORT} $(whoami)@$(hostname)${NC}"
-    echo -e "  ${YELLOW}然后在本地 Chrome 地址栏打开: chrome://inspect${NC}"
-    echo ""
-    echo -e "  ${YELLOW}登录完成后，按任意键继续...${NC}"
-  else
-    echo -e "  ${YELLOW}请在各 Chrome 标签页中登录你需要的平台${NC}"
-    echo -e "  ${YELLOW}登录完成后，按任意键继续...${NC}"
-  fi
+  echo -e "  ${YELLOW}请在各 Chrome 标签页中登录你需要的平台${NC}"
+  echo -e "  ${YELLOW}登录完成后，按任意键继续...${NC}"
   read -n 1 -s -r
   echo ""
 else
