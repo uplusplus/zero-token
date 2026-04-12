@@ -17,15 +17,15 @@ $SERVER_PORT = if ($env:SERVER_PORT) { $env:SERVER_PORT } else { "8080" }
 $CDP_PORT = 9333
 
 # ── Color output ─────────────────────────────────────────────────
-function Write-Info  { param($m) Write-Host "[INFO] $m" -ForegroundColor Cyan }
-function Write-Ok    { param($m) Write-Host "[  OK] $m" -ForegroundColor Green }
-function Write-Warn  { param($m) Write-Host "[WARN] $m" -ForegroundColor Yellow }
-function Write-Fail  { param($m) Write-Host "[FAIL] $m" -ForegroundColor Red }
+function Write-Info  { param($m) Write-Host "  $m" -ForegroundColor Cyan }
+function Write-Ok    { param($m) Write-Host "  $m" -ForegroundColor Green }
+function Write-Warn  { param($m) Write-Host "  $m" -ForegroundColor Yellow }
+function Write-Fail  { param($m) Write-Host "  $m" -ForegroundColor Red }
 
 Write-Host ""
-Write-Host "+-------------------------------------+" -ForegroundColor White
-Write-Host "|       zero-token  Windows Installer   |" -ForegroundColor White
-Write-Host "+-------------------------------------+" -ForegroundColor White
+Write-Host "  +-------------------------------------+" -ForegroundColor White
+Write-Host "  |     zero-token  Windows Installer    |" -ForegroundColor White
+Write-Host "  +-------------------------------------+" -ForegroundColor White
 Write-Host ""
 
 # ── 1. Check & Install Node.js ──────────────────────────────────
@@ -76,7 +76,7 @@ function Check-Node {
     # Check again
     $nodeExe = Get-Command node -ErrorAction SilentlyContinue
     if (-not $nodeExe) {
-        #  shell  PATH，
+        #  shell  PATH
         $commonPaths = @(
             "$env:ProgramFiles\nodejs\node.exe",
             "${env:ProgramFiles(x86)}\nodejs\node.exe",
@@ -109,24 +109,28 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
 }
 Write-Ok "npm $(npm -v)"
 
-# ── 3. Check Chrome ──────────────────────────────────────────
-$chromePath = @(
+# ── 3. Detect Chrome ──────────────────────────────────────────
+$chromePaths = @(
     "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
     "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
     "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
+)
+$chromePath = $chromePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 
 if (-not $chromePath) {
-    $chromePath = Get-Command chrome -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+    $cmd = Get-Command chrome -ErrorAction SilentlyContinue
+    if ($cmd) { $chromePath = $cmd.Source }
 }
 if (-not $chromePath) {
-    $chromePath = Get-Command chromium -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+    $cmd = Get-Command chromium -ErrorAction SilentlyContinue
+    if ($cmd) { $chromePath = $cmd.Source }
 }
 
 if ($chromePath) {
     Write-Ok "Chrome: $chromePath"
 } else {
-    Write-Warn "Chrome not found, install it then run start.bat"
+    Write-Warn "Chrome not found, install Chrome then run start.bat manually"
+    Write-Warn "Web-class providers will not be available"
 }
 
 # ── 4. Clone repo ──────────────────────────────────────────────
@@ -135,7 +139,6 @@ if (Test-Path $INSTALL_DIR) {
     Set-Location $INSTALL_DIR
     if (Test-Path ".git") {
         if (Test-Path "config.yaml") { Copy-Item config.yaml config.yaml.bak }
-        # git non-zero exit should not stop script
         $oldEAP = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
         $fetchOut = git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 fetch origin main 2>&1
@@ -188,71 +191,7 @@ npm prune --omit=dev 2>$null
 
 $ErrorActionPreference = $oldEAP
 
-# ── 6. Create start script ──────────────────────────────────────────
-$startBat = @"
-@echo off
-cd /d "$INSTALL_DIR"
-set SERVER_PORT=$SERVER_PORT
-set CDP_PORT=$CDP_PORT
-
-echo.
-echo +-------------------------------------+
-echo ^|       zero-token  Starting...       ^|
-echo +-------------------------------------+
-echo.
-
-set "CHROME_EXE="
-for %%C in (
-    "%ProgramFiles%\Google\Chrome\Application\chrome.exe"
-    "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"
-) do if exist %%C set "CHROME_EXE=%%C"
-
-if not defined CHROME_EXE (
-    echo [WARN] Chrome not found, skipping browser setup
-    goto :start_server
-)
-
-echo [INFO] Starting Chrome (CDP port %CDP_PORT%)...
-start "" "%CHROME_EXE%" --remote-debugging-port=%CDP_PORT% --user-data-dir="%USERPROFILE%\.zero-token\chrome-data" --no-first-run --no-default-browser-check --no-sandbox
-timeout /t 3 /nobreak >nul
-
-echo [INFO] Opening Provider login pages...
-start "" "%CHROME_EXE%" "https://chat.deepseek.com"
-start "" "%CHROME_EXE%" "https://claude.ai"
-start "" "%CHROME_EXE%" "https://kimi.com"
-start "" "%CHROME_EXE%" "https://doubao.com"
-start "" "%CHROME_EXE%" "https://xiaomimo.ai"
-start "" "%CHROME_EXE%" "https://chat.qwen.ai"
-start "" "%CHROME_EXE%" "https://chatglm.cn"
-start "" "%CHROME_EXE%" "https://chat.z.ai"
-start "" "%CHROME_EXE%" "https://perplexity.ai"
-start "" "%CHROME_EXE%" "https://chatgpt.com"
-start "" "%CHROME_EXE%" "https://gemini.google.com"
-start "" "%CHROME_EXE%" "https://grok.com"
-
-echo.
-echo [INFO] Log in to the platforms you need in Chrome tabs
-echo [INFO] Press any key after logging in...
-pause >nul
-
-echo.
-echo [INFO] Capturing login credentials...
-node scripts\onboard.mjs --all
-
-:start_server
-timeout /t 3 /nobreak >nul
-
-echo.
-echo [INFO] Starting zero-token service (port: %SERVER_PORT%)...
-echo [INFO] Press Ctrl+C to stop
-echo.
-node dist\server.mjs
-"@
-
-
-$startBat | Out-File -FilePath "$INSTALL_DIR\start.bat" -Encoding ASCII
-
-# ── 7. Default config ──────────────────────────────────────────────
+# ── 6. Default config ──────────────────────────────────────────────
 if (-not (Test-Path "$INSTALL_DIR\config.yaml")) {
     if (Test-Path "$INSTALL_DIR\config.yaml.example") {
         Copy-Item "$INSTALL_DIR\config.yaml.example" "$INSTALL_DIR\config.yaml"
@@ -261,20 +200,154 @@ if (-not (Test-Path "$INSTALL_DIR\config.yaml")) {
 
 # ── Done ─────────────────────────────────────────────────────
 Write-Host ""
-Write-Host "+-------------------------------------+" -ForegroundColor Green
-Write-Host "|         Install Complete!                  |" -ForegroundColor Green
-Write-Host "+-------------------------------------+" -ForegroundColor Green
+Write-Host "  +-------------------------------------+" -ForegroundColor Green
+Write-Host "  |       Install Complete!              |" -ForegroundColor Green
+Write-Host "  +-------------------------------------+" -ForegroundColor Green
 Write-Host ""
-Write-Host "  Install dir   $INSTALL_DIR"
-Write-Host "  Start script  $INSTALL_DIR\start.bat"
-Write-Host "  Config file   $INSTALL_DIR\config.yaml"
-Write-Host ""
-Write-Host "  Double-click start.bat to start" -ForegroundColor Cyan
+Write-Host "  Install dir    $INSTALL_DIR"
+Write-Host "  Config file    $INSTALL_DIR\config.yaml"
 Write-Host ""
 
-# Ask to start now
-$answer = Read-Host "Start now? (Y/n)"
-if ($answer -ne 'n' -and $answer -ne 'N') {
-    Set-Location $INSTALL_DIR
-    & "$INSTALL_DIR\start.bat"
+# ── 7. Start Chrome & Open Provider Login Pages ──────────────────
+if ($chromePath) {
+    $chromeDataDir = "$env:USERPROFILE\.zero-token\chrome-data"
+
+    # Kill stale Chrome using our CDP port
+    $oldEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    $existing = Get-Process chrome -ErrorAction SilentlyContinue | Where-Object {
+        $_.CommandLine -like "*--remote-debugging-port=$CDP_PORT*"
+    }
+    if ($existing) {
+        Write-Warn "Stopping stale Chrome process on port $CDP_PORT..."
+        $existing | Stop-Process -Force
+        Start-Sleep -Seconds 2
+    }
+    $ErrorActionPreference = $oldEAP
+
+    # Create chrome data dir & clean singleton locks
+    New-Item -ItemType Directory -Force -Path $chromeDataDir | Out-Null
+    Remove-Item "$chromeDataDir\SingletonLock" -Force -ErrorAction SilentlyContinue
+    Remove-Item "$chromeDataDir\SingletonCookie" -Force -ErrorAction SilentlyContinue
+
+    # Launch Chrome with CDP
+    Write-Info "Starting Chrome (CDP port $CDP_PORT)..."
+    $chromeArgs = @(
+        "--remote-debugging-port=$CDP_PORT"
+        "--user-data-dir=$chromeDataDir"
+        "--no-first-run"
+        "--no-default-browser-check"
+        "--disable-background-networking"
+        "--disable-sync"
+        "--disable-translate"
+        "--remote-allow-origins=*"
+    )
+    $chromeProc = Start-Process -FilePath $chromePath -ArgumentList $chromeArgs -PassThru
+
+    # Wait for CDP to be ready
+    Write-Info "Waiting for Chrome to be ready..."
+    $ready = $false
+    for ($i = 1; $i -le 15; $i++) {
+        Start-Sleep -Seconds 1
+        try {
+            $resp = Invoke-WebRequest -Uri "http://localhost:$CDP_PORT/json/version" -UseBasicParsing -TimeoutSec 2
+            if ($resp.StatusCode -eq 200) { $ready = $true; break }
+        } catch { }
+    }
+
+    if ($ready) {
+        Write-Ok "Chrome CDP ready (http://localhost:$CDP_PORT)"
+
+        # Open provider login pages via CDP
+        $providerUrls = @(
+            "https://chat.deepseek.com"
+            "https://claude.ai"
+            "https://kimi.com"
+            "https://doubao.com"
+            "https://xiaomimo.ai"
+            "https://chat.qwen.ai"
+            "https://chatglm.cn"
+            "https://chat.z.ai"
+            "https://perplexity.ai"
+            "https://chatgpt.com"
+            "https://gemini.google.com"
+            "https://grok.com"
+        )
+
+        Write-Info "Opening provider login pages..."
+        foreach ($url in $providerUrls) {
+            try {
+                Invoke-WebRequest -Uri "http://localhost:$CDP_PORT/json/new?$url" -Method PUT -UseBasicParsing -TimeoutSec 5 | Out-Null
+            } catch { }
+        }
+        Write-Ok "Opened $($providerUrls.Count) provider login pages"
+
+        Write-Host ""
+        Write-Host "  Please log in to the platforms you need in Chrome tabs" -ForegroundColor Yellow
+        Write-Host "  Press Enter after logging in..." -ForegroundColor Yellow
+        Read-Host | Out-Null
+
+        # Capture credentials
+        if (Test-Path "$INSTALL_DIR\scripts\onboard.mjs") {
+            Write-Info "Capturing login credentials..."
+            Set-Location $INSTALL_DIR
+            $oldEAP = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            node scripts\onboard.mjs --all
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warn "Credential capture failed, run manually later: cd $INSTALL_DIR && node scripts\onboard.mjs"
+            }
+            $ErrorActionPreference = $oldEAP
+        }
+    } else {
+        Write-Warn "Chrome CDP not ready, skipping provider navigation"
+        Write-Warn "You can start Chrome manually: `"$chromePath`" --remote-debugging-port=$CDP_PORT"
+    }
+} else {
+    Write-Warn "Chrome not found, Web-class providers unavailable"
+    Write-Warn "Install Chrome then run start.bat, or start Chrome manually with:"
+    Write-Warn "  chrome --remote-debugging-port=$CDP_PORT"
+}
+
+# ── 8. Start Service ──────────────────────────────────────────
+Write-Host ""
+Write-Info "Starting zero-token service (port: $SERVER_PORT)..."
+Write-Host "  Press Ctrl+C to stop" -ForegroundColor Yellow
+Write-Host ""
+
+Set-Location $INSTALL_DIR
+$env:NODE_ENV = "production"
+$env:SERVER_PORT = $SERVER_PORT
+
+# Open health check page in Chrome after a short delay
+if ($ready -and $chromePath) {
+    Start-Job -ScriptBlock {
+        param($cdpPort, $serverPort)
+        Start-Sleep -Seconds 3
+        try {
+            Invoke-WebRequest -Uri "http://localhost:$cdpPort/json/new?http://localhost:$serverPort/health" -Method PUT -UseBasicParsing -TimeoutSec 5 | Out-Null
+        } catch { }
+    } -ArgumentList $CDP_PORT, $SERVER_PORT | Out-Null
+}
+
+# Cleanup Chrome on exit
+$cleanup = {
+    param($chromePid, $chromeExe)
+    if ($chromePid) {
+        $p = Get-Process -Id $chromePid -ErrorAction SilentlyContinue
+        if ($p) {
+            Stop-Process -Id $chromePid -Force -ErrorAction SilentlyContinue
+            Write-Host "  Chrome stopped" -ForegroundColor Green
+        }
+    }
+}
+try {
+    node dist\server.mjs
+} finally {
+    if ($chromeProc -and -not $chromeProc.HasExited) {
+        Write-Info "Stopping Chrome..."
+        Stop-Process -Id $chromeProc.Id -Force -ErrorAction SilentlyContinue
+        Write-Ok "Chrome stopped"
+    }
+    Write-Ok "zero-token stopped"
 }
