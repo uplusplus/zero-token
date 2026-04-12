@@ -69,7 +69,7 @@ export class PerplexityProvider implements ProviderAdapter {
   constructor(opts: PerplexityProviderOptions, models?: ModelDefinition[]) {
     this.cookie = opts.cookie;
     this.userAgent = opts.userAgent ?? DEFAULT_USER_AGENT;
-    this.cdpPort = opts.cdpPort ?? 9222;
+    this.cdpPort = opts.cdpPort ?? 9333;
     this.cdpUrl = opts.cdpUrl ?? cdpUrlForPort(this.cdpPort);
     this.models = models ?? createPerplexityModels();
   }
@@ -268,7 +268,7 @@ export class PerplexityProvider implements ProviderAdapter {
     if (!reachable) {
       throw new Error(
         `Perplexity: Chrome not reachable at ${this.cdpUrl}. ` +
-        "Start Chrome with --remote-debugging-port=9222.",
+        "Start Chrome with --remote-debugging-port=9333.",
       );
     }
 

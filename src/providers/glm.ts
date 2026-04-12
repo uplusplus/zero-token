@@ -104,7 +104,7 @@ export class GLMProvider implements ProviderAdapter {
   constructor(opts: GLMProviderOptions, models?: ModelDefinition[]) {
     this.cookie = opts.cookie;
     this.userAgent = opts.userAgent ?? DEFAULT_USER_AGENT;
-    this.cdpPort = opts.cdpPort ?? 9222;
+    this.cdpPort = opts.cdpPort ?? 9333;
     this.cdpUrl = opts.cdpUrl ?? cdpUrlForPort(this.cdpPort);
     this.deviceId = crypto.randomUUID().replace(/-/g, "");
     this.models = models ?? createGLMModels();
@@ -270,7 +270,7 @@ export class GLMProvider implements ProviderAdapter {
     if (!reachable) {
       throw new Error(
         `GLM: Chrome not reachable at ${this.cdpUrl}. ` +
-        "Start Chrome with --remote-debugging-port=9222.",
+        "Start Chrome with --remote-debugging-port=9333.",
       );
     }
 

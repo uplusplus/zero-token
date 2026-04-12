@@ -12,7 +12,7 @@ const BrowserProfileSchema = z.object({
   /** Path to user data directory for persistent sessions */
   userDataDir: z.string().optional(),
   /** CDP port for remote debugging */
-  cdpPort: z.number().default(9222),
+  cdpPort: z.number().default(9333),
   /** Launch mode */
   mode: z.enum(["launch", "headless", "attach"]).default("launch"),
 });
@@ -52,7 +52,7 @@ export const ConfigSchema = z.object({
     profiles: z.record(z.string(), BrowserProfileSchema).default({
       default: {
         name: "default",
-        cdpPort: 9222,
+        cdpPort: 9333,
         mode: "launch",
       },
     }),

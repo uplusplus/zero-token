@@ -10,7 +10,7 @@ browser:
   profiles:
     default:
       name: "default"
-      cdpPort: 9222
+      cdpPort: 9333
       mode: attach  # attach: 用已登录的 Chrome（推荐） | launch: 启动新窗口 | headless: 无界面
 
 providers:
@@ -44,42 +44,42 @@ providers:
   - id: qwen-web
     enabled: false
     profile: default
-    auth: '{"cookie":"YOUR_QWEN_COOKIE","cdpPort":"9222"}'
+    auth: '{"cookie":"YOUR_QWEN_COOKIE","cdpPort":"9333"}'
 
   - id: qwen-cn-web
     enabled: false
     profile: default
-    auth: '{"cookie":"YOUR_QWEN_CN_COOKIE","xsrfToken":"YOUR_XSRF_TOKEN","cdpPort":"9222"}'
+    auth: '{"cookie":"YOUR_QWEN_CN_COOKIE","xsrfToken":"YOUR_XSRF_TOKEN","cdpPort":"9333"}'
 
   - id: glm-web
     enabled: false
     profile: default
-    auth: '{"cookie":"YOUR_GLM_COOKIE","cdpPort":"9222"}'
+    auth: '{"cookie":"YOUR_GLM_COOKIE","cdpPort":"9333"}'
 
   - id: glm-intl-web
     enabled: false
     profile: default
-    auth: '{"cookie":"YOUR_GLM_INTL_COOKIE","cdpPort":"9222"}'
+    auth: '{"cookie":"YOUR_GLM_INTL_COOKIE","cdpPort":"9333"}'
 
   - id: perplexity-web
     enabled: false
     profile: default
-    auth: '{"cookie":"YOUR_PERPLEXITY_COOKIE","cdpPort":"9222"}'
+    auth: '{"cookie":"YOUR_PERPLEXITY_COOKIE","cdpPort":"9333"}'
 
   - id: chatgpt-web
     enabled: false
     profile: default
-    auth: '{"cookie":"YOUR_CHATGPT_COOKIE","cdpPort":"9222"}'
+    auth: '{"cookie":"YOUR_CHATGPT_COOKIE","cdpPort":"9333"}'
 
   - id: gemini-web
     enabled: false
     profile: default
-    auth: '{"cookie":"YOUR_GEMINI_COOKIE","cdpPort":"9222"}'
+    auth: '{"cookie":"YOUR_GEMINI_COOKIE","cdpPort":"9333"}'
 
   - id: grok-web
     enabled: false
     profile: default
-    auth: '{"cookie":"YOUR_GROK_COOKIE","cdpPort":"9222"}'
+    auth: '{"cookie":"YOUR_GROK_COOKIE","cdpPort":"9333"}'
 
   # ── API-based providers (OpenAI-compatible, need API key) ──
 

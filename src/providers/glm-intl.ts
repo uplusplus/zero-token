@@ -70,7 +70,7 @@ export class GLMIntlProvider implements ProviderAdapter {
   constructor(opts: GLMIntlProviderOptions, models?: ModelDefinition[]) {
     this.cookie = opts.cookie;
     this.userAgent = opts.userAgent ?? DEFAULT_USER_AGENT;
-    this.cdpPort = opts.cdpPort ?? 9222;
+    this.cdpPort = opts.cdpPort ?? 9333;
     this.cdpUrl = opts.cdpUrl ?? cdpUrlForPort(this.cdpPort);
     this.models = models ?? createGLMIntlModels();
   }
@@ -325,7 +325,7 @@ export class GLMIntlProvider implements ProviderAdapter {
     if (!reachable) {
       throw new Error(
         `GLM Intl: Chrome not reachable at ${this.cdpUrl}. ` +
-        "Start Chrome with --remote-debugging-port=9222.",
+        "Start Chrome with --remote-debugging-port=9333.",
       );
     }
 

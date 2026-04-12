@@ -133,7 +133,7 @@
 - [x] **Chrome 启动脚本** — 2026-04-11 完成
   - `scripts/start-chrome.sh`
   - 自动检测 Chrome/Chromium 路径（macOS/Linux/WSL/Deepin）
-  - 带 `--remote-debugging-port=9222` 启动
+  - 带 `--remote-debugging-port=9333` 启动
   - 自动打开 9 个平台登录页
 
 - [x] **Onboard Auth Wizard** — 2026-04-11 完成

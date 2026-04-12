@@ -81,7 +81,7 @@ export class QwenProvider implements ProviderAdapter {
     this.cookie = opts.cookie;
     this.sessionToken = opts.sessionToken ?? "";
     this.userAgent = opts.userAgent ?? DEFAULT_USER_AGENT;
-    this.cdpPort = opts.cdpPort ?? 9222;
+    this.cdpPort = opts.cdpPort ?? 9333;
     this.cdpUrl = opts.cdpUrl ?? cdpUrlForPort(this.cdpPort);
     this.models = models ?? createQwenModels();
   }
@@ -242,7 +242,7 @@ export class QwenProvider implements ProviderAdapter {
     if (!reachable) {
       throw new Error(
         `Qwen: Chrome not reachable at ${this.cdpUrl}. ` +
-        "Start Chrome with --remote-debugging-port=9222 or configure browser profile.",
+        "Start Chrome with --remote-debugging-port=9333 or configure browser profile.",
       );
     }
 

@@ -72,7 +72,7 @@ export class GeminiProvider implements ProviderAdapter {
   constructor(opts: GeminiProviderOptions, models?: ModelDefinition[]) {
     this.cookie = opts.cookie;
     this.userAgent = opts.userAgent ?? DEFAULT_USER_AGENT;
-    this.cdpPort = opts.cdpPort ?? 9222;
+    this.cdpPort = opts.cdpPort ?? 9333;
     this.cdpUrl = opts.cdpUrl ?? cdpUrlForPort(this.cdpPort);
     this.models = models ?? createGeminiModels();
   }
@@ -218,7 +218,7 @@ export class GeminiProvider implements ProviderAdapter {
 
     const reachable = await isChromeReachable(this.cdpUrl, 2000);
     if (!reachable) {
-      throw new Error(`Gemini: Chrome not reachable at ${this.cdpUrl}. Start with --remote-debugging-port=9222.`);
+      throw new Error(`Gemini: Chrome not reachable at ${this.cdpUrl}. Start with --remote-debugging-port=9333.`);
     }
 
     const wsUrl = await getChromeWebSocketUrl(this.cdpUrl, 5000);

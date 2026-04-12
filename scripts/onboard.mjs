@@ -11,7 +11,7 @@ import { createInterface } from 'node:readline';
 import { WebSocket } from 'ws';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const CDP_PORT = process.env.CDP_PORT || 9222;
+const CDP_PORT = process.env.CDP_PORT || 9333;
 // Try IPv6 first (some Chrome builds default to ::1), fall back to IPv4
 const CDP_HOSTS = ['localhost', '127.0.0.1', '[::1]'];
 

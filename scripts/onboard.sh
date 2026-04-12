@@ -5,7 +5,7 @@
 
 set -e
 
-CDP_PORT="${CDP_PORT:-9222}"
+CDP_PORT="${CDP_PORT:-9333}"
 CONFIG_FILE="${LLMGW_CONFIG:-$(dirname "$0")/../config.yaml}"
 CDP_URL="http://localhost:$CDP_PORT"
 

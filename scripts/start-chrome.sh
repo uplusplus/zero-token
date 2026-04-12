@@ -4,7 +4,7 @@
 
 set -e
 
-PORT="${CDP_PORT:-9222}"
+PORT="${CDP_PORT:-9333}"
 USER_DATA_DIR="${CHROME_DATA_DIR:-$HOME/.llmgw/chrome-data}"
 
 echo "=========================================="

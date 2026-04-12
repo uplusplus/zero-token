@@ -73,7 +73,7 @@ export class GrokProvider implements ProviderAdapter {
   constructor(opts: GrokProviderOptions, models?: ModelDefinition[]) {
     this.cookie = opts.cookie;
     this.userAgent = opts.userAgent ?? DEFAULT_USER_AGENT;
-    this.cdpPort = opts.cdpPort ?? 9222;
+    this.cdpPort = opts.cdpPort ?? 9333;
     this.cdpUrl = opts.cdpUrl ?? cdpUrlForPort(this.cdpPort);
     this.models = models ?? createGrokModels();
   }
@@ -267,7 +267,7 @@ export class GrokProvider implements ProviderAdapter {
 
     const reachable = await isChromeReachable(this.cdpUrl, 2000);
     if (!reachable) {
-      throw new Error(`Grok: Chrome not reachable at ${this.cdpUrl}. Start with --remote-debugging-port=9222.`);
+      throw new Error(`Grok: Chrome not reachable at ${this.cdpUrl}. Start with --remote-debugging-port=9333.`);
     }
 
     const wsUrl = await getChromeWebSocketUrl(this.cdpUrl, 5000);
