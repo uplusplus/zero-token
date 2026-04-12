@@ -173,7 +173,7 @@ if ($LASTEXITCODE -ne 0) { npm install 2>&1 | Out-Null }
 Write-Ok "Dependencies installed"
 
 Write-Info "Build project..."
-$buildOut = & npx tsdown 2>$null
+$buildOut = cmd /c "npx tsdown 2>nul"
 $buildExit = $LASTEXITCODE
 if ($buildOut) { $buildOut | Write-Host }
 if ($buildExit -ne 0) {
