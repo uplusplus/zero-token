@@ -11,6 +11,7 @@
 # ── 配置 ─────────────────────────────────────────────────────
 $ErrorActionPreference = "Stop"
 chcp 65001 | Out-Null
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $REPO_URL = "https://github.com/uplusplus/zero-token.git"
 $INSTALL_DIR = "$env:USERPROFILE\zero-token"
 $MIN_NODE_VER = 22
@@ -173,16 +174,19 @@ npm ci 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) { npm install 2>&1 | Out-Null }
 Write-Ok "依赖安装完成"
 
-Write-Info "构建项目..."
+Write-Info "Build project..."
 $buildOut = & npx tsdown 2>&1
 $buildExit = $LASTEXITCODE
-$buildOut | ForEach-Object { Write-Host $_ }
+$buildOut | ForEach-Object {
+    if ($_ -is [System.Management.Automation.ErrorRecord]) { Write-Host $_.Exception.Message }
+    else { Write-Host $_ }
+}
 if ($buildExit -ne 0) {
-    Write-Fail "构建失败"
-    Read-Host "按 Enter 退出"
+    Write-Fail "Build failed"
+    Read-Host "Press Enter to exit"
     exit 1
 }
-Write-Ok "构建完成"
+Write-Ok "Build complete"
 
 npm prune --omit=dev 2>&1 | Out-Null
 
