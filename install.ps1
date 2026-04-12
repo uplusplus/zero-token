@@ -163,15 +163,15 @@ if (Test-Path $INSTALL_DIR) {
 
 # ── 5. 安装依赖 & 构建 ──────────────────────────────────────
 Write-Info "安装依赖..."
-npm ci 2>$null
-if ($LASTEXITCODE -ne 0) { npm install }
+npm ci 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) { npm install 2>&1 | Out-Null }
 Write-Ok "依赖安装完成"
 
 Write-Info "构建项目..."
-npx tsdown
+npx tsdown 2>&1 | Write-Host
 Write-Ok "构建完成"
 
-npm prune --production 2>$null
+npm prune --omit=dev 2>&1 | Out-Null
 
 # ── 6. 创建启动脚本 ──────────────────────────────────────────
 $startBat = @"

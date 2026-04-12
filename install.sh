@@ -229,7 +229,7 @@ info "构建项目 ..."
 npx tsdown
 ok "构建完成"
 
-npm prune --production 2>/dev/null || true
+npm prune --omit=dev 2>/dev/null || true
 
 # ── 4. 默认配置 ──────────────────────────────────────────────
 if [ ! -f "config.yaml" ]; then
