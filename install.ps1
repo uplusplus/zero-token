@@ -8,7 +8,7 @@
     irm https://raw.githubusercontent.com/uplusplus/zero-token/main/install.ps1 | iex
 #>
 
-# ── 配置 ─────────────────────────────────────────────────────
+# ── Config ─────────────────────────────────────────────────────
 $ErrorActionPreference = "Stop"
 $REPO_URL = "https://github.com/uplusplus/zero-token.git"
 $INSTALL_DIR = "$env:USERPROFILE\zero-token"
@@ -16,45 +16,45 @@ $MIN_NODE_VER = 22
 $SERVER_PORT = if ($env:SERVER_PORT) { $env:SERVER_PORT } else { "8080" }
 $CDP_PORT = 9333
 
-# ── 颜色输出 ─────────────────────────────────────────────────
+# ── Color output ─────────────────────────────────────────────────
 function Write-Info  { param($m) Write-Host "[INFO] $m" -ForegroundColor Cyan }
 function Write-Ok    { param($m) Write-Host "[  OK] $m" -ForegroundColor Green }
 function Write-Warn  { param($m) Write-Host "[WARN] $m" -ForegroundColor Yellow }
 function Write-Fail  { param($m) Write-Host "[FAIL] $m" -ForegroundColor Red }
 
 Write-Host ""
-Write-Host "┌─────────────────────────────────────┐" -ForegroundColor White
-Write-Host "│       zero-token  Windows 安装      │" -ForegroundColor White
-Write-Host "└─────────────────────────────────────┘" -ForegroundColor White
+Write-Host "+-------------------------------------+" -ForegroundColor White
+Write-Host "|       zero-token  Windows Installer   |" -ForegroundColor White
+Write-Host "+-------------------------------------+" -ForegroundColor White
 Write-Host ""
 
-# ── 1. 检测 & 安装 Node.js ──────────────────────────────────
+# ── 1. Check & Install Node.js ──────────────────────────────────
 function Install-NodeJs {
-    Write-Info "安装 Node.js ${MIN_NODE_VER}.x ..."
+    Write-Info "Installing Node.js ${MIN_NODE_VER}.x ..."
 
-    # 优先 winget（用户级）
+    # Prefer winget (user-level)
     if (Get-Command winget -ErrorAction SilentlyContinue) {
-        Write-Info "使用 winget 安装..."
+        Write-Info "Installing via winget..."
         winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements --silent
     }
-    # 其次 chocolatey
+    # Then chocolatey
     elseif (Get-Command choco -ErrorAction SilentlyContinue) {
-        Write-Info "使用 chocolatey 安装..."
+        Write-Info "Installing via chocolatey..."
         choco install nodejs-lts -y
     }
-    # 最后 msi 下载安装
+    # Last resort: msi download
     else {
         $arch = if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" }
         $msiUrl = "https://nodejs.org/dist/v22.15.0/node-v22.15.0-${arch}.msi"
         $msiPath = "$env:TEMP\nodejs-installer.msi"
-        Write-Info "下载 Node.js 安装包..."
+        Write-Info "Downloading Node.js installer..."
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         Invoke-WebRequest -Uri $msiUrl -OutFile $msiPath -UseBasicParsing
-        Write-Info "运行安装程序（可能需要管理员权限）..."
+        Write-Info "Running installer (may need admin)..."
         Start-Process msiexec.exe -ArgumentList "/i `"$msiPath`" /qn /norestart" -Wait
         Remove-Item $msiPath -Force
 
-        # 刷新 PATH
+        # Refresh PATH
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
                     [System.Environment]::GetEnvironmentVariable("Path", "User")
     }
@@ -69,14 +69,14 @@ function Check-Node {
             Write-Ok "Node.js v${ver}"
             return
         }
-        Write-Warn "Node.js v${ver} 版本过低"
+        Write-Warn "Node.js v${ver} too old, need >= ${MIN_NODE_VER}"
     }
     Install-NodeJs
 
-    # 再次检查
+    # Check again
     $nodeExe = Get-Command node -ErrorAction SilentlyContinue
     if (-not $nodeExe) {
-        # 可能需要重启 shell 刷新 PATH，尝试常见路径
+        #  shell  PATH，
         $commonPaths = @(
             "$env:ProgramFiles\nodejs\node.exe",
             "${env:ProgramFiles(x86)}\nodejs\node.exe",
@@ -92,8 +92,8 @@ function Check-Node {
     }
 
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-        Write-Fail "Node.js 安装失败，请手动安装: https://nodejs.org/"
-        Read-Host "按 Enter 退出"
+        Write-Fail "Node.js install failed, install manually: https://nodejs.org/"
+        Read-Host "Press Enter to exit"
         exit 1
     }
     Write-Ok "Node.js $(node -v)"
@@ -101,15 +101,15 @@ function Check-Node {
 
 Check-Node
 
-# ── 2. 检测 npm ──────────────────────────────────────────────
+# ── 2. Check npm ──────────────────────────────────────────────
 if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-    Write-Fail "npm 未找到"
-    Read-Host "按 Enter 退出"
+    Write-Fail "npm not found"
+    Read-Host "Press Enter to exit"
     exit 1
 }
 Write-Ok "npm $(npm -v)"
 
-# ── 3. 检测 Chrome ──────────────────────────────────────────
+# ── 3. Check Chrome ──────────────────────────────────────────
 $chromePath = @(
     "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
     "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
@@ -126,32 +126,32 @@ if (-not $chromePath) {
 if ($chromePath) {
     Write-Ok "Chrome: $chromePath"
 } else {
-    Write-Warn "未找到 Chrome，请手动安装后运行 start.bat 启动调试浏览器"
+    Write-Warn "Chrome not found, install it then run start.bat"
 }
 
-# ── 4. 克隆仓库 ──────────────────────────────────────────────
+# ── 4. Clone repo ──────────────────────────────────────────────
 if (Test-Path $INSTALL_DIR) {
-    Write-Info "更新已有安装..."
+    Write-Info "Updating existing install..."
     Set-Location $INSTALL_DIR
     if (Test-Path ".git") {
         if (Test-Path "config.yaml") { Copy-Item config.yaml config.yaml.bak }
-        # git 非零退出不应中断脚本
+        # git non-zero exit should not stop script
         $oldEAP = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
         $fetchOut = git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 fetch origin main 2>&1
-        if ($LASTEXITCODE -ne 0) { Write-Warn "fetch 失败:`n$fetchOut" }
+        if ($LASTEXITCODE -ne 0) { Write-Warn "fetch failed:`n$fetchOut" }
         $resetOut = git reset --hard origin/main 2>&1
-        if ($LASTEXITCODE -ne 0) { Write-Warn "reset 失败:`n$resetOut" }
+        if ($LASTEXITCODE -ne 0) { Write-Warn "reset failed:`n$resetOut" }
         $ErrorActionPreference = $oldEAP
         if (Test-Path "config.yaml.bak") { Move-Item config.yaml.bak config.yaml -Force }
-        if ($LASTEXITCODE -eq 0) { Write-Ok "已更新" }
+        if ($LASTEXITCODE -eq 0) { Write-Ok "Updated" }
     }
 } else {
-    Write-Info "下载 zero-token..."
+    Write-Info "Downloading zero-token..."
     try {
         git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 clone --depth 1 $REPO_URL $INSTALL_DIR 2>$null
     } catch {
-        Write-Warn "git clone 失败，使用镜像下载..."
+        Write-Warn "git clone failed, using mirror..."
         $zipUrl = "https://gh-proxy.com/https://github.com/uplusplus/zero-token/archive/refs/heads/main.zip"
         $zipPath = "$env:TEMP\zero-token.zip"
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -163,14 +163,14 @@ if (Test-Path $INSTALL_DIR) {
     Set-Location $INSTALL_DIR
 }
 
-# ── 5. 安装依赖 & 构建 ──────────────────────────────────────
+# ── 5. Install deps & Build ──────────────────────────────────────
 $oldEAP = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 
-Write-Info "安装依赖..."
+Write-Info "Installing dependencies..."
 npm ci 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) { npm install 2>&1 | Out-Null }
-Write-Ok "依赖安装完成"
+Write-Ok "Dependencies installed"
 
 Write-Info "Build project..."
 $buildOut = & npx tsdown 2>&1
@@ -193,20 +193,21 @@ npm prune --omit=dev 2>$null
 
 $ErrorActionPreference = $oldEAP
 
-# ── 6. 创建启动脚本 ──────────────────────────────────────────
+# ── 6. Create start script ──────────────────────────────────────────
 $startBat = @"
 @echo off
+chcp 65001 >nul
 cd /d "$INSTALL_DIR"
 set SERVER_PORT=$SERVER_PORT
 set CDP_PORT=$CDP_PORT
 
 echo.
-echo ┌─────────────────────────────────────┐
-echo │       zero-token  启动中...         │
-echo └─────────────────────────────────────┘
+echo +-------------------------------------+
+echo |       zero-token  Starting...       |
+echo +-------------------------------------+
 echo.
 
-REM 启动 Chrome（调试模式）
+REM Start Chrome (debug mode)
 set "CHROME="
 for %%P in (
     "%ProgramFiles%\Google\Chrome\Application\chrome.exe"
@@ -217,12 +218,12 @@ for %%P in (
 )
 
 if defined CHROME (
-    echo [INFO] 启动 Chrome (CDP port %CDP_PORT%)...
+    echo [INFO] Starting Chrome (CDP port %CDP_PORT%)...
     start "" %CHROME% --remote-debugging-port=%CDP_PORT% --user-data-dir="%USERPROFILE%\.zero-token\chrome-data" --no-first-run --no-default-browser-check --remote-allow-origins=* --no-sandbox
     timeout /t 3 /nobreak >nul
 
-    REM 打开各平台登录页
-    echo [INFO] 打开 Provider 登录页...
+    REM Open provider login pages
+    echo [INFO] Opening Provider login pages...
     for %%U in (
         "https://chat.deepseek.com"
         "https://claude.ai"
@@ -241,52 +242,52 @@ if defined CHROME (
     )
 
     echo.
-    echo [INFO] 请在 Chrome 标签页中登录需要的平台
-    echo [INFO] 登录完成后，按任意键继续...
+    echo [INFO] Log in to the platforms you need in Chrome tabs
+    echo [INFO] Press any key after logging in...
     pause >nul
 
-    REM 抓取凭据
+    REM Capture credentials
     echo.
-    echo [INFO] 抓取登录凭据...
+    echo [INFO] Capturing login credentials...
     node scripts\onboard.mjs --all
 ) else (
-    echo [WARN] 未找到 Chrome，跳过 Web Provider 登录
+    echo [WARN] Chrome not found, skipping Web Provider login
 )
 
-REM 打开健康检查页
+REM Open health check page
 timeout /t 3 /nobreak >nul
 curl -s -o nul -X PUT "http://localhost:%CDP_PORT%/json/new?http://localhost:%SERVER_PORT%/health" 2>nul
 
 echo.
-echo [INFO] 启动 zero-token 服务 (端口: %SERVER_PORT%)...
-echo [INFO] 按 Ctrl+C 停止服务
+echo [INFO] Starting zero-token service (port: %SERVER_PORT%)...
+echo [INFO] Press Ctrl+C to stop
 echo.
 node dist\server.mjs
 "@
 $startBat | Out-File -FilePath "$INSTALL_DIR\start.bat" -Encoding ASCII
 
-# ── 7. 默认配置 ──────────────────────────────────────────────
+# ── 7. Default config ──────────────────────────────────────────────
 if (-not (Test-Path "$INSTALL_DIR\config.yaml")) {
     if (Test-Path "$INSTALL_DIR\config.yaml.example") {
         Copy-Item "$INSTALL_DIR\config.yaml.example" "$INSTALL_DIR\config.yaml"
     }
 }
 
-# ── 完成 ─────────────────────────────────────────────────────
+# ── Done ─────────────────────────────────────────────────────
 Write-Host ""
-Write-Host "┌─────────────────────────────────────┐" -ForegroundColor Green
-Write-Host "│         安装完成！                  │" -ForegroundColor Green
-Write-Host "└─────────────────────────────────────┘" -ForegroundColor Green
+Write-Host "+-------------------------------------+" -ForegroundColor Green
+Write-Host "|         Install Complete!                  |" -ForegroundColor Green
+Write-Host "+-------------------------------------+" -ForegroundColor Green
 Write-Host ""
-Write-Host "  安装目录    $INSTALL_DIR"
-Write-Host "  启动命令    $INSTALL_DIR\start.bat"
-Write-Host "  配置文件    $INSTALL_DIR\config.yaml"
+Write-Host "  Install dir   $INSTALL_DIR"
+Write-Host "  Start script  $INSTALL_DIR\start.bat"
+Write-Host "  Config file   $INSTALL_DIR\config.yaml"
 Write-Host ""
-Write-Host "  双击 start.bat 即可启动" -ForegroundColor Cyan
+Write-Host "  Double-click start.bat to start" -ForegroundColor Cyan
 Write-Host ""
 
-# 询问是否立即启动
-$answer = Read-Host "是否立即启动? (Y/n)"
+# Ask to start now
+$answer = Read-Host "Start now? (Y/n)"
 if ($answer -ne 'n' -and $answer -ne 'N') {
     Set-Location $INSTALL_DIR
     & "$INSTALL_DIR\start.bat"
