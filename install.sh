@@ -368,4 +368,17 @@ cleanup() {
 }
 trap cleanup INT TERM
 
+# 打开健康检查页
+(
+  sleep 3
+  HEALTH_URL="http://localhost:$SERVER_PORT/health"
+  if command -v xdg-open &>/dev/null; then
+    xdg-open "$HEALTH_URL" 2>/dev/null &
+  elif command -v open &>/dev/null; then
+    open "$HEALTH_URL" 2>/dev/null &
+  elif [ -n "$CHROME_PATH" ]; then
+    "$CHROME_PATH" "$HEALTH_URL" 2>/dev/null &
+  fi
+) &
+
 node dist/server.mjs
