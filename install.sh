@@ -196,7 +196,13 @@ if [ -d "$INSTALL_DIR" ]; then
   info "更新已有安装 ..."
   cd "$INSTALL_DIR"
   if [ -d ".git" ]; then
-    GIT_SSL_BACKEND=openssl git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 pull --ff-only 2>/dev/null || warn "拉取更新失败，保留当前版本"
+    # 暂存用户配置
+    [ -f config.yaml ] && cp config.yaml config.yaml.bak
+    GIT_SSL_BACKEND=openssl git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 fetch origin main 2>/dev/null \
+      && git reset --hard origin/main 2>/dev/null \
+      || warn "拉取更新失败，保留当前版本"
+    # 恢复用户配置
+    [ -f config.yaml.bak ] && mv config.yaml.bak config.yaml
   fi
 else
   info "下载 zero-token ..."
