@@ -32,59 +32,51 @@
 
 ## 快速开始
 
-### 1. 安装
+### 一键安装（推荐）
 
 ```bash
-git clone https://github.com/uplusplus/llmgw.git
-cd llmgw
-npm install
+curl -fsSL https://raw.githubusercontent.com/uplusplus/zero-token/main/install.sh | sudo bash
 ```
 
-### 2. 启动 Chrome（调试端口）
+脚本会自动完成：检测/安装 Node.js → 安装 Chromium → 克隆仓库 → 安装依赖 → 构建 → 注册 systemd 服务。
 
-Web 类 provider 需要通过 CDP 连接已登录的 Chrome：
+安装后服务自动启动，访问 `http://localhost:8080`。
+
+> **环境变量：**`SERVER_PORT=8080 curl -fsSL ... | sudo bash` 自定义端口。
+
+### 服务管理
 
 ```bash
-# Windows
-"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
-
-# macOS
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
-
-# Linux
-google-chrome --remote-debugging-port=9222
+systemctl start zero-token     # 启动
+systemctl stop zero-token      # 停止
+systemctl restart zero-token   # 重启
+journalctl -u zero-token -f    # 查看日志
 ```
 
-验证 Chrome 就绪：
+### 配置 Web 类 Provider
+
+Web 类 Provider 需要登录各平台并抓取凭据：
 
 ```bash
-curl http://localhost:9222/json/version
+cd /opt/zero-token
+bash scripts/start-chrome.sh   # 打开 Chrome 登录页面
+node scripts/onboard.mjs       # 抓取 Cookie 写入 config.yaml
+systemctl restart zero-token   # 重启生效
 ```
 
-### 3. 抓取登录凭据
+API 类 Provider（Ollama / OpenRouter 等）无需此步骤，编辑 config.yaml 填入 API Key 即可。
 
-在目标平台（如 chatglm.cn）完成登录后，运行凭据抓取脚本自动写入 config.yaml：
-
-```bash
-node scripts/onboard.mjs
-```
-
-按提示选择 provider，脚本会自动提取 Cookie 并更新 `config.yaml`。
-
-### 4. 启动服务
+### 开发者手动安装
 
 ```bash
-# 开发模式（热重载，改代码自动重启）
+git clone https://github.com/uplusplus/zero-token.git && cd zero-token
+npm install && npm run build && npm start
+
+# 或开发模式（热重载）
 npm run dev
-
-# 生产模式
-npm run build
-npm start
 ```
 
-服务默认监听 `http://0.0.0.0:8080`。
-
-### 5. 测试接口
+### 测试接口
 
 ```bash
 # 健康检查
