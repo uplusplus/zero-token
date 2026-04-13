@@ -171,16 +171,12 @@ $oldEAP = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 
 Write-Info "Installing dependencies..."
-npm ci
+npm install
 if ($LASTEXITCODE -ne 0) {
-    Write-Warn "npm ci failed, retrying with npm install..."
-    npm install
-    if ($LASTEXITCODE -ne 0) {
-        Write-Fail "Dependency installation failed"
-        $ErrorActionPreference = $oldEAP
-        Read-Host "Press Enter to exit"
-        exit 1
-    }
+    Write-Fail "Dependency installation failed"
+    $ErrorActionPreference = $oldEAP
+    Read-Host "Press Enter to exit"
+    exit 1
 }
 Write-Ok "Dependencies installed"
 
