@@ -171,17 +171,24 @@ $oldEAP = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 
 Write-Info "Installing dependencies..."
-npm ci 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { npm install 2>&1 | Out-Null }
+npm ci
+if ($LASTEXITCODE -ne 0) {
+    Write-Warn "npm ci failed, retrying with npm install..."
+    npm install
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Dependency installation failed"
+        $ErrorActionPreference = $oldEAP
+        Read-Host "Press Enter to exit"
+        exit 1
+    }
+}
 Write-Ok "Dependencies installed"
 
 Write-Info "Build project..."
-$buildOut = cmd /c "npx tsdown"
-$buildExit = $LASTEXITCODE
-if ($buildOut) { $buildOut | Write-Host }
-if ($buildExit -ne 0) {
-    Write-Fail "Build failed, running again to show errors..."
-    npx tsdown
+npx tsdown
+if ($LASTEXITCODE -ne 0) {
+    Write-Fail "Build failed"
+    $ErrorActionPreference = $oldEAP
     Read-Host "Press Enter to exit"
     exit 1
 }
