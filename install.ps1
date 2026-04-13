@@ -226,41 +226,54 @@ Write-Host ""
 
 # ── 7. Start Chrome & Open Provider Login Pages ──────────────────
 if ($chromePath) {
-    $chromeDataDir = "$env:USERPROFILE\.zero-token\chrome-data"
+    # Check if Chrome CDP is already available
+    $alreadyReady = $false
+    try {
+        $probe = Invoke-WebRequest -Uri "http://localhost:$CDP_PORT/json/version" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+        if ($probe.Content -match '"Browser"') { $alreadyReady = $true }
+    } catch { }
 
-    # Create chrome data dir & clean singleton locks (separate profile = independent instance)
-    New-Item -ItemType Directory -Force -Path $chromeDataDir | Out-Null
-    Remove-Item "$chromeDataDir\SingletonLock" -Force -ErrorAction SilentlyContinue
-    Remove-Item "$chromeDataDir\SingletonCookie" -Force -ErrorAction SilentlyContinue
+    if ($alreadyReady) {
+        Write-Ok "Chrome CDP already running on port $CDP_PORT"
+        $ready = $true
+        $chromeProc = $null
+    } else {
+        $chromeDataDir = "$env:USERPROFILE\.zero-token\chrome-data"
 
-    # Launch Chrome with CDP
-    Write-Info "Starting Chrome (CDP port $CDP_PORT)..."
-    $chromeArgs = @(
-        "--remote-debugging-port=$CDP_PORT"
-        "--user-data-dir=$chromeDataDir"
-        "--no-first-run"
-        "--no-default-browser-check"
-        "--disable-background-networking"
-        "--disable-sync"
-        "--disable-translate"
-        "--remote-allow-origins=*"
-    )
-    $chromeProc = Start-Process -FilePath $chromePath -ArgumentList $chromeArgs -PassThru
+        # Create chrome data dir & clean singleton locks (separate profile = independent instance)
+        New-Item -ItemType Directory -Force -Path $chromeDataDir | Out-Null
+        Remove-Item "$chromeDataDir\SingletonLock" -Force -ErrorAction SilentlyContinue
+        Remove-Item "$chromeDataDir\SingletonCookie" -Force -ErrorAction SilentlyContinue
 
-    # Wait for CDP to be ready
-    Write-Info "Waiting for Chrome to be ready..."
-    $ready = $false
-    for ($i = 1; $i -le 15; $i++) {
-        Start-Sleep -Seconds 1
-        try {
-            $resp = Invoke-WebRequest -Uri "http://localhost:$CDP_PORT/json/version" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
-            $content = $resp.Content
-            if ($content -match '"Browser"') {
-                $ready = $true
-                break
+        # Launch Chrome with CDP
+        Write-Info "Starting Chrome (CDP port $CDP_PORT)..."
+        $chromeArgs = @(
+            "--remote-debugging-port=$CDP_PORT"
+            "--user-data-dir=$chromeDataDir"
+            "--no-first-run"
+            "--no-default-browser-check"
+            "--disable-background-networking"
+            "--disable-sync"
+            "--disable-translate"
+            "--remote-allow-origins=*"
+        )
+        $chromeProc = Start-Process -FilePath $chromePath -ArgumentList $chromeArgs -PassThru
+
+        # Wait for CDP to be ready
+        Write-Info "Waiting for Chrome to be ready..."
+        $ready = $false
+        for ($i = 1; $i -le 15; $i++) {
+            Start-Sleep -Seconds 1
+            try {
+                $resp = Invoke-WebRequest -Uri "http://localhost:$CDP_PORT/json/version" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+                $content = $resp.Content
+                if ($content -match '"Browser"') {
+                    $ready = $true
+                    break
+                }
+            } catch {
+                # Chrome not ready yet, retry
             }
-        } catch {
-            # Chrome not ready yet, retry
         }
     }
 
