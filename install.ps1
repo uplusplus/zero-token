@@ -185,7 +185,7 @@ if ($LASTEXITCODE -ne 0) {
 Write-Ok "Dependencies installed"
 
 Write-Info "Build project..."
-npx tsdown
+npm run build
 if ($LASTEXITCODE -ne 0) {
     Write-Fail "Build failed"
     $ErrorActionPreference = $oldEAP
