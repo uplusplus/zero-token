@@ -5,6 +5,7 @@
 # 修改说明：
 #   1. 不再注册 systemd 服务，直接在终端前台运行
 #   2. Chrome 不使用 headless 模式，前台打开供用户交互登录
+#   3. 已安装时进入可选菜单，按需执行操作
 
 set -e
 
@@ -39,6 +40,331 @@ if [ "$(id -u)" -ne 0 ]; then
   fi
 fi
 
+# ── 检测是否已安装 ────────────────────────────────────────────
+ALREADY_INSTALLED=false
+if [ -d "$INSTALL_DIR" ] && [ -f "$INSTALL_DIR/dist/server.mjs" ]; then
+  ALREADY_INSTALLED=true
+fi
+
+# ── 已安装：可选菜单 ─────────────────────────────────────────
+show_menu() {
+  echo -e "${BOLD}┌─────────────────────────────────────┐${NC}"
+  echo -e "${BOLD}│       已安装，选择操作：            │${NC}"
+  echo -e "${BOLD}└─────────────────────────────────────┘${NC}"
+  echo ""
+  echo -e "  ${CYAN}1)${NC} 启动 Chrome 并打开 Provider 登录页"
+  echo -e "  ${CYAN}2)${NC} 抓取登录凭据 (onboard)"
+  echo -e "  ${CYAN}3)${NC} 启动 zero-token 服务"
+  echo -e "  ${CYAN}4)${NC} 更新代码 & 重新构建"
+  echo -e "  ${CYAN}5)${NC} 全部执行 (Chrome → 登录 → 抓取 → 启动)"
+  echo -e "  ${CYAN}0)${NC} 退出"
+  echo ""
+  read -rp "  请选择 [0-5]: " MENU_CHOICE
+}
+
+if [ "$ALREADY_INSTALLED" = true ]; then
+  # ── 检测 Chrome（菜单需要） ────────────────────────────────
+  CHROME_PATH=""
+  CHROME_DATA_DIR="${HOME}/.zero-token/chrome-data"
+
+  # 从已安装目录检测 Chrome
+  detect_chrome_quick() {
+    local candidates=(
+      "/opt/google/chrome/google-chrome"
+      "/usr/bin/google-chrome"
+      "/usr/bin/google-chrome-stable"
+      "/usr/bin/chromium"
+      "/snap/bin/chromium"
+    )
+    for p in "${candidates[@]}"; do
+      if [ -f "$p" ]; then
+        echo "$p" && return
+      fi
+    done
+    for cmd in google-chrome google-chrome-stable chromium chromium-browser; do
+      local p
+      p=$(command -v "$cmd" 2>/dev/null) || continue
+      echo "$p" && return
+    done
+    echo ""
+  }
+  CHROME_PATH=$(detect_chrome_quick)
+
+  show_menu
+
+  case "$MENU_CHOICE" in
+    1)
+      # ── 启动 Chrome 并打开登录页 ──────────────────────────
+      if [ -z "$CHROME_PATH" ]; then
+        warn "未找到 Chrome/Chromium，无法启动"
+        exit 1
+      fi
+
+      CHROME_PID=""
+      CHROME_ARGS=(
+        --remote-debugging-port="$CDP_PORT"
+        --user-data-dir="$CHROME_DATA_DIR"
+        --no-first-run
+        --no-default-browser-check
+        --disable-background-networking
+        --disable-sync
+        --disable-translate
+        --remote-allow-origins=*
+        --no-sandbox
+        --disable-dev-shm-usage
+      )
+
+      if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+        ok "Chrome 已在运行 (CDP: http://localhost:$CDP_PORT)，跳过启动"
+      else
+        if ss -tlnp 2>/dev/null | grep -q ":$CDP_PORT " || netstat -tlnp 2>/dev/null | grep -q ":$CDP_PORT "; then
+          warn "端口 $CDP_PORT 已被占用，清理残留 Chrome ..."
+          pkill -f "remote-debugging-port=$CDP_PORT" 2>/dev/null || true
+          sleep 2
+        fi
+
+        mkdir -p "$CHROME_DATA_DIR"
+        rm -f "$CHROME_DATA_DIR/SingletonLock" "$CHROME_DATA_DIR/SingletonCookie" 2>/dev/null
+
+        "$CHROME_PATH" "${CHROME_ARGS[@]}" > /dev/null 2>&1 &
+        CHROME_PID=$!
+        ok "Chrome 启动中 (PID: $CHROME_PID) ..."
+
+        info "等待 Chrome 就绪 ..."
+        for i in $(seq 1 15); do
+          if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+            break
+          fi
+          if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+            warn "Chrome 进程已退出"
+            CHROME_PID=""
+            break
+          fi
+          sleep 1
+        done
+      fi
+
+      if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+        ok "Chrome CDP 就绪 (http://localhost:$CDP_PORT)"
+
+        PROVIDER_URLS=(
+          "https://chat.deepseek.com"
+          "https://claude.ai"
+          "https://kimi.com"
+          "https://doubao.com"
+          "https://xiaomimo.ai"
+          "https://chat.qwen.ai"
+          "https://chatglm.cn"
+          "https://chat.z.ai"
+          "https://perplexity.ai"
+          "https://chatgpt.com"
+          "https://gemini.google.com"
+          "https://grok.com"
+        )
+
+        info "自动打开 Provider 登录页 ..."
+        for url in "${PROVIDER_URLS[@]}"; do
+          curl -sf -X PUT "http://localhost:$CDP_PORT/json/new?$url" > /dev/null 2>&1 || true
+        done
+        ok "已打开 ${#PROVIDER_URLS[@]} 个 Provider 登录页"
+      else
+        warn "Chrome CDP 未就绪"
+      fi
+      ;;
+    2)
+      # ── 抓取凭据 ─────────────────────────────────────────
+      if [ -f "$INSTALL_DIR/scripts/onboard.mjs" ]; then
+        info "抓取登录凭据 ..."
+        cd "$INSTALL_DIR"
+        node scripts/onboard.mjs --all || warn "凭据抓取失败，可手动运行: cd $INSTALL_DIR && node scripts/onboard.mjs"
+      else
+        warn "未找到 onboard.mjs"
+      fi
+      ;;
+    3)
+      # ── 启动服务 ─────────────────────────────────────────
+      info "启动 zero-token 服务 (端口: $SERVER_PORT) ..."
+      echo -e "  ${YELLOW}按 Ctrl+C 停止服务${NC}"
+      echo ""
+
+      cd "$INSTALL_DIR"
+      export NODE_ENV=production
+      export SERVER_PORT="$SERVER_PORT"
+
+      cleanup() {
+        echo ""
+        info "正在停止 ..."
+        ok "zero-token 已停止"
+        exit 0
+      }
+      trap cleanup INT TERM
+
+      node dist/server.mjs
+      ;;
+    4)
+      # ── 更新代码 & 重新构建 ──────────────────────────────
+      info "更新代码 ..."
+      cd "$INSTALL_DIR"
+      if [ -d ".git" ]; then
+        [ -f config.yaml ] && cp config.yaml config.yaml.bak
+        if ! GIT_SSL_BACKEND=openssl git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 fetch origin main 2>&1; then
+          warn "fetch 失败，尝试镜像 ..."
+          git remote set-url origin "https://gh-proxy.com/https://github.com/uplusplus/zero-token.git"
+          git fetch origin main 2>&1 || warn "所有 fetch 均失败"
+        fi
+        git reset --hard origin/main 2>&1 || warn "reset 失败，保留当前版本"
+        [ -f config.yaml.bak ] && mv config.yaml.bak config.yaml
+      else
+        warn "非 git 安装，无法自动更新，请手动重新下载"
+        exit 1
+      fi
+
+      info "重新安装依赖 ..."
+      npm ci 2>/dev/null || npm install
+      ok "依赖安装完成"
+
+      info "重新构建 ..."
+      npx tsdown
+      ok "构建完成"
+      npm prune --omit=dev 2>/dev/null || true
+      ;;
+    5)
+      # ── 全部执行 ─────────────────────────────────────────
+      if [ -z "$CHROME_PATH" ]; then
+        warn "未找到 Chrome/Chromium，无法启动"
+        exit 1
+      fi
+
+      # 启动 Chrome
+      CHROME_PID=""
+      CHROME_ARGS=(
+        --remote-debugging-port="$CDP_PORT"
+        --user-data-dir="$CHROME_DATA_DIR"
+        --no-first-run
+        --no-default-browser-check
+        --disable-background-networking
+        --disable-sync
+        --disable-translate
+        --remote-allow-origins=*
+        --no-sandbox
+        --disable-dev-shm-usage
+      )
+
+      if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+        ok "Chrome 已在运行 (CDP: http://localhost:$CDP_PORT)，跳过启动"
+      else
+        if ss -tlnp 2>/dev/null | grep -q ":$CDP_PORT " || netstat -tlnp 2>/dev/null | grep -q ":$CDP_PORT "; then
+          warn "端口 $CDP_PORT 已被占用，清理残留 Chrome ..."
+          pkill -f "remote-debugging-port=$CDP_PORT" 2>/dev/null || true
+          sleep 2
+        fi
+
+        mkdir -p "$CHROME_DATA_DIR"
+        rm -f "$CHROME_DATA_DIR/SingletonLock" "$CHROME_DATA_DIR/SingletonCookie" 2>/dev/null
+
+        "$CHROME_PATH" "${CHROME_ARGS[@]}" > /dev/null 2>&1 &
+        CHROME_PID=$!
+        ok "Chrome 启动中 (PID: $CHROME_PID) ..."
+
+        info "等待 Chrome 就绪 ..."
+        for i in $(seq 1 15); do
+          if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+            break
+          fi
+          if ! kill -0 "$CHROME_PID" 2>/dev/null; then
+            warn "Chrome 进程已退出"
+            CHROME_PID=""
+            break
+          fi
+          sleep 1
+        done
+      fi
+
+      if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+        ok "Chrome CDP 就绪 (http://localhost:$CDP_PORT)"
+
+        PROVIDER_URLS=(
+          "https://chat.deepseek.com"
+          "https://claude.ai"
+          "https://kimi.com"
+          "https://doubao.com"
+          "https://xiaomimo.ai"
+          "https://chat.qwen.ai"
+          "https://chatglm.cn"
+          "https://chat.z.ai"
+          "https://perplexity.ai"
+          "https://chatgpt.com"
+          "https://gemini.google.com"
+          "https://grok.com"
+        )
+
+        info "自动打开 Provider 登录页 ..."
+        for url in "${PROVIDER_URLS[@]}"; do
+          curl -sf -X PUT "http://localhost:$CDP_PORT/json/new?$url" > /dev/null 2>&1 || true
+        done
+        ok "已打开 ${#PROVIDER_URLS[@]} 个 Provider 登录页"
+
+        echo ""
+        echo -e "  ${YELLOW}请在各 Chrome 标签页中登录你需要的平台${NC}"
+        echo -e "  ${YELLOW}登录完成后，按任意键继续...${NC}"
+        read -n 1 -s -r
+        echo ""
+      else
+        warn "Chrome CDP 未就绪，跳过登录步骤"
+      fi
+
+      # 抓取凭据
+      if [ -f "$INSTALL_DIR/scripts/onboard.mjs" ]; then
+        info "抓取登录凭据 ..."
+        cd "$INSTALL_DIR"
+        node scripts/onboard.mjs --all || warn "凭据抓取失败，可手动运行: cd $INSTALL_DIR && node scripts/onboard.mjs"
+      fi
+
+      # 启动服务
+      echo ""
+      info "启动 zero-token 服务 (端口: $SERVER_PORT) ..."
+      echo -e "  ${YELLOW}按 Ctrl+C 停止服务${NC}"
+      echo ""
+
+      cd "$INSTALL_DIR"
+      export NODE_ENV=production
+      export SERVER_PORT="$SERVER_PORT"
+
+      cleanup() {
+        echo ""
+        info "正在停止 ..."
+        if [ -n "$CHROME_PID" ] && kill -0 "$CHROME_PID" 2>/dev/null; then
+          kill "$CHROME_PID" 2>/dev/null || true
+          ok "Chrome 已停止"
+        else
+          info "Chrome 非本脚本启动，保持运行"
+        fi
+        ok "zero-token 已停止"
+        exit 0
+      }
+      trap cleanup INT TERM
+
+      (
+        sleep 3
+        curl -sf -X PUT "http://localhost:$CDP_PORT/json/new?http://localhost:$SERVER_PORT/health" > /dev/null 2>&1 || true
+      ) &
+
+      node dist/server.mjs
+      ;;
+    0)
+      info "已退出"
+      exit 0
+      ;;
+    *)
+      warn "无效选择"
+      exit 1
+      ;;
+  esac
+
+  # 菜单项 1/2/4 执行完后正常退出
+  exit 0
+else
+# ── 首次安装流程 ─────────────────────────────────────────────
 # ── 1. 检测 & 安装 Node.js ──────────────────────────────────
 install_nodejs() {
   info "安装 Node.js ${MIN_NODE_VER}.x ..."
@@ -384,3 +710,5 @@ trap cleanup INT TERM
 ) &
 
 node dist/server.mjs
+
+fi # ── 结束 首次安装 / 已安装分支 ──
