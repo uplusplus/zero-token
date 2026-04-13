@@ -177,7 +177,7 @@ Write-Info "Installing dependencies..."
 if (Test-Path "node_modules") { Remove-Item "node_modules" -Recurse -Force }
 if (Test-Path "package-lock.json") { Remove-Item "package-lock.json" -Force }
 
-npm install
+npm install --include=dev
 if ($LASTEXITCODE -ne 0) {
     Write-Fail "Dependency installation failed"
     $ErrorActionPreference = $oldEAP
@@ -186,8 +186,15 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Ok "Dependencies installed"
 
+# Verify tsdown is available (devDependency required for build)
+$tsdownBin = Join-Path $INSTALL_DIR "node_modules\.bin\tsdown"
+if (-not (Test-Path $tsdownBin)) {
+    Write-Warn "tsdown not found, reinstalling devDependencies..."
+    npm install tsdown@0.21.2
+}
+
 Write-Info "Build project..."
-npm run build
+& npx tsdown
 if ($LASTEXITCODE -ne 0) {
     Write-Fail "Build failed"
     $ErrorActionPreference = $oldEAP

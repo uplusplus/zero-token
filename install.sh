@@ -220,8 +220,14 @@ if [ "$ALREADY_INSTALLED" = true ]; then
       fi
 
       info "重新安装依赖 ..."
-      npm ci 2>/dev/null || npm install
+      npm ci --include=dev 2>/dev/null || npm install --include=dev
       ok "依赖安装完成"
+
+      # 确保 tsdown 可用
+      if [ ! -f "node_modules/.bin/tsdown" ]; then
+        warn "tsdown 未找到，重新安装 ..."
+        npm install tsdown@0.21.2
+      fi
 
       info "重新构建 ..."
       npx tsdown
@@ -551,8 +557,14 @@ else
 fi
 
 info "安装依赖 ..."
-npm ci 2>/dev/null || npm install
+npm ci --include=dev 2>/dev/null || npm install --include=dev
 ok "依赖安装完成"
+
+# 确保 tsdown 可用
+if [ ! -f "node_modules/.bin/tsdown" ]; then
+  warn "tsdown 未找到，重新安装 ..."
+  npm install tsdown@0.21.2
+fi
 
 info "构建项目 ..."
 npx tsdown
