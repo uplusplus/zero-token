@@ -114,7 +114,7 @@ if [ "$ALREADY_INSTALLED" = true ]; then
         --disable-dev-shm-usage
       )
 
-      if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+      if curl -sfm 2 "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
         ok "Chrome 已在运行 (CDP: http://localhost:$CDP_PORT)，跳过启动"
       else
         if ss -tlnp 2>/dev/null | grep -q ":$CDP_PORT " || netstat -tlnp 2>/dev/null | grep -q ":$CDP_PORT "; then
@@ -132,7 +132,7 @@ if [ "$ALREADY_INSTALLED" = true ]; then
 
         info "等待 Chrome 就绪 ..."
         for i in $(seq 1 15); do
-          if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+          if curl -sfm 4 "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
             break
           fi
           if ! kill -0 "$CHROME_PID" 2>/dev/null; then
@@ -144,7 +144,7 @@ if [ "$ALREADY_INSTALLED" = true ]; then
         done
       fi
 
-      if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+      if curl -sfm 5 "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
         ok "Chrome CDP 就绪 (http://localhost:$CDP_PORT)"
 
         PROVIDER_URLS=(
@@ -164,7 +164,7 @@ if [ "$ALREADY_INSTALLED" = true ]; then
 
         info "自动打开 Provider 登录页 ..."
         for url in "${PROVIDER_URLS[@]}"; do
-          curl -sf -X PUT "http://localhost:$CDP_PORT/json/new?$url" > /dev/null 2>&1 || true
+          curl -sfm 5 -X PUT "http://localhost:$CDP_PORT/json/new?$url" > /dev/null 2>&1 || true
         done
         ok "已打开 ${#PROVIDER_URLS[@]} 个 Provider 登录页"
       else
@@ -256,7 +256,7 @@ if [ "$ALREADY_INSTALLED" = true ]; then
         --disable-dev-shm-usage
       )
 
-      if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+      if curl -sfm 3 "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
         ok "Chrome 已在运行 (CDP: http://localhost:$CDP_PORT)，跳过启动"
       else
         if ss -tlnp 2>/dev/null | grep -q ":$CDP_PORT " || netstat -tlnp 2>/dev/null | grep -q ":$CDP_PORT "; then
@@ -274,7 +274,7 @@ if [ "$ALREADY_INSTALLED" = true ]; then
 
         info "等待 Chrome 就绪 ..."
         for i in $(seq 1 15); do
-          if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+          if curl -sfm 4 "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
             break
           fi
           if ! kill -0 "$CHROME_PID" 2>/dev/null; then
@@ -286,7 +286,7 @@ if [ "$ALREADY_INSTALLED" = true ]; then
         done
       fi
 
-      if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+      if curl -sfm 4 "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
         ok "Chrome CDP 就绪 (http://localhost:$CDP_PORT)"
 
         PROVIDER_URLS=(
@@ -306,7 +306,7 @@ if [ "$ALREADY_INSTALLED" = true ]; then
 
         info "自动打开 Provider 登录页 ..."
         for url in "${PROVIDER_URLS[@]}"; do
-          curl -sf -X PUT "http://localhost:$CDP_PORT/json/new?$url" > /dev/null 2>&1 || true
+          curl -sfm 4 -X PUT "http://localhost:$CDP_PORT/json/new?$url" > /dev/null 2>&1 || true
         done
         ok "已打开 ${#PROVIDER_URLS[@]} 个 Provider 登录页"
 
@@ -352,7 +352,7 @@ if [ "$ALREADY_INSTALLED" = true ]; then
 
       (
         sleep 3
-        curl -sf -X PUT "http://localhost:$CDP_PORT/json/new?http://localhost:$SERVER_PORT/health" > /dev/null 2>&1 || true
+        curl -sfm 4 -X PUT "http://localhost:$CDP_PORT/json/new?http://localhost:$SERVER_PORT/health" > /dev/null 2>&1 || true
       ) &
 
       node dist/server.mjs
@@ -610,7 +610,7 @@ if [ -n "$CHROME_PATH" ]; then
   )
 
   # 检查 Chrome 是否已经在运行（CDP 端口已监听）
-  if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+  if curl -sfm 3 "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
     ok "Chrome 已在运行 (CDP: http://localhost:$CDP_PORT)，跳过启动"
   else
   # 杀掉残留 Chrome 进程（可能占着 CDP 端口）
@@ -631,7 +631,7 @@ if [ -n "$CHROME_PATH" ]; then
     # 等待 Chrome CDP 就绪
     info "等待 Chrome 就绪 ..."
     for i in $(seq 1 15); do
-      if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+      if curl -sfm 4 "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
         break
       fi
       # 检查进程是否还活着
@@ -646,7 +646,7 @@ if [ -n "$CHROME_PATH" ]; then
     done
   fi
 
-  if curl -sf "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
+  if curl -sfm 4 "http://localhost:$CDP_PORT/json/version" > /dev/null 2>&1; then
     ok "Chrome CDP 就绪 (http://localhost:$CDP_PORT)"
 
     # 自动打开各 provider 登录页
@@ -667,7 +667,7 @@ if [ -n "$CHROME_PATH" ]; then
 
     info "自动打开 Provider 登录页 ..."
     for url in "${PROVIDER_URLS[@]}"; do
-      curl -sf -X PUT "http://localhost:$CDP_PORT/json/new?$url" > /dev/null 2>&1 || true
+      curl -sfm 4 -X PUT "http://localhost:$CDP_PORT/json/new?$url" > /dev/null 2>&1 || true
     done
     ok "已打开 ${#PROVIDER_URLS[@]} 个 Provider 登录页"
   else
@@ -718,7 +718,7 @@ trap cleanup INT TERM
 # 通过 CDP 打开健康检查页
 (
   sleep 3
-  curl -sf -X PUT "http://localhost:$CDP_PORT/json/new?http://localhost:$SERVER_PORT/health" > /dev/null 2>&1 || true
+  curl -sfm 4 -X PUT "http://localhost:$CDP_PORT/json/new?http://localhost:$SERVER_PORT/health" > /dev/null 2>&1 || true
 ) &
 
 node dist/server.mjs
